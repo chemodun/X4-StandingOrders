@@ -24,6 +24,10 @@ ffi.cdef [[
   } StorageInfo;
 
 	UniverseID GetPlayerID(void);
+	bool IsComponentClass(UniverseID componentid, const char* classname);
+	bool IsComponentOperational(UniverseID componentid);
+	bool IsComponentWrecked(UniverseID componentid);
+	size_t GetOrderQueueFirstLoopIdx(UniverseID controllableid, bool* isvalid);
   uint32_t GetOrders(Order* result, uint32_t resultlen, UniverseID controllableid);
 	uint32_t CreateOrder(UniverseID controllableid, const char* orderid, bool default);
 	bool EnableOrder(UniverseID controllableid, size_t idx);
@@ -145,7 +149,7 @@ function StandingOrders.getStandingOrders(shipId)
         idx = tonumber(orderData.queueidx),
         order = ffi.string(orderData.orderdef),
       }
-      table.insert(orders, order)
+      orders[#orders + 1] = order
     end
   end
   return orders
@@ -164,7 +168,7 @@ function StandingOrders.checkShip(shipId)
   if owner ~= "player" then
     return false, { info = "NotPlayerShip", detail = "owner=" .. tostring(owner) }
   end
-  if not C.IsComponentOperational(shipId) then
+  if not C.IsComponentOperational(shipId) or C.IsComponentWrecked(shipId) then
     return false, { info = "ShipNotOperational" }
   end
   return true
