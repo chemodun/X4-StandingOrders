@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mdscript name="Standing_Orders_Interface" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <cues>
+
+    <cue name="Main" version="2">
+      <actions>
+        <debug_text text="'Standing_Orders: Main'" chance="100" filter="scripts" />
+        <set_value name="$sourceShipForCloning" exact="null" />
+      </actions>
+      <cues>
+        <cue name="On_Reload" instantiate="true">
+          <conditions>
+            <event_ui_triggered screen="'StandingOrders'" control="'Reloaded'" />
+          </conditions>
+          <actions>
+            <debug_text text="'StandingOrders: On_Reload'" chance="100" filter="scripts" />
+            <signal_cue_instantly cue="Reloaded" />
+          </actions>
+        </cue>
+
+        <cue name="Reloaded" instantiate="true">
+          <conditions>
+            <event_cue_signalled />
+            <event_game_loaded />
+          </conditions>
+          <actions>
+            <debug_text text="'Standing_Orders: Reloaded'"
+              chance="100" filter="general" />
+            <set_value name="$sourceShipForCloning" exact="null" />
+          </actions>
+        </cue>
+
+        <cue name="On_Get_Actions" instantiate="true">
+          <conditions>
+            <event_cue_signalled cue="md.Interact_Menu_API.Get_Actions" />
+            <debug_text text="'Standing_Orders: Get_Actions invoked with param: %s'.[event.param]" chance="100" filter="scripts" />
+            <debug_text text="'Standing_Orders: Get_Actions invoked with object: %s'.[@event.param.$object]" chance="100" filter="scripts" />
+            <check_value value="player.holomap.isopen" />
+            <check_value value="event.param.$object? and @event.param.$object != null" />
+            <debug_text text="'Standing_Orders: Get_Actions invoked with object.class: %s'.[@event.param.$object.class]" chance="100"
+              filter="scripts" />
+            <check_value value="@event.param.$object.isclass.{class.object}" />
+            <check_value value="@event.param.$object.trueowner == faction.player" />
+            <check_value value="@event.param.$object.isoperational" />
+          </conditions>
+          <actions>
+            <set_value name="$params" exact="event.param" />
+            <set_value name="$args" exact="null" />
+            <signal_cue_instantly
+              cue="md.Interact_Menu_API.Add_Action"
+              param="table[
+                $id         = 'player_standing_orders_header',
+                $section    = 'interaction',
+                $text       = '[ %s ]'.[{1972092408, 1}],
+                $mouseover  = {1972092408, 1},
+                $active     = false
+              ]" />
+            <do_if value="@sourceShipForCloning == null">
+
+              <debug_text text="'StandingOrders: Updating interaction menu actions to add Source Selection'" chance="100"
+                filter="scripts" />
+
+              <signal_cue_instantly
+                cue="md.Interact_Menu_API.Add_Action"
+                param="table[
+                  $id         = 'player_standing_orders_select_source',
+                  $section    = 'interaction',
+                  $text       = ' %s'.[{1972092408, 10101}],
+                  $mouseover  = {1972092408, 10101},
+                  $active     = true,
+                  $callback   =  Select_Source
+                ]" />
+            </do_if>
+          </actions>
+        </cue>
+
+        <cue name="Select_Source" instantiate="true">
+          <conditions>
+            <event_cue_signalled />
+          </conditions>
+          <actions>
+            <debug_text text="'StandingOrders: Select_Source invoked with param: %s'.[event.param]" chance="100" filter="scripts" />
+
+            <set_value name="$args"
+              exact="table[
+                $command            = 'check_source',
+                $source             = @event.param.$object,
+                ]" />
+            <do_if value="$args != null">
+              <do_if value="not player.entity.$StandingOrdersRequest?">
+                <set_value name="player.entity.$StandingOrdersRequest" exact="[]" />
+              </do_if>
+              <append_to_list name="player.entity.$StandingOrdersRequest" exact="$args" />
+              <debug_text
+                text="'StandingOrders: Sending %s with args: %s'.[$args.$command, $args]"
+                chance="100" filter="scripts" />
+              <raise_lua_event name="'StandingOrders.Request'" />
+            </do_if>
+          </actions>
+        </cue>
+
+        <cue name="Process_Results" instantiate="true">
+          <conditions>
+            <event_ui_triggered screen="'StandingOrders'" control="'Response'" />
+          </conditions>
+          <actions>
+            <debug_text text="'StandingOrders: Capture_Results invoked with data in $StandingOrdersResponse: %s'.[player.entity.$StandingOrdersResponse]"
+              chance="100" filter="scripts" />
+            <!--Look
+            up the action by id to get the callback.-->
+            <set_value name="$result" exact="@player.entity.$StandingOrdersResponse" />
+            <debug_text text="'StandingOrders: Process_Results invoked with result: %s'.[$result]" chance="100" filter="scripts" />
+            <do_if value="$result? and @$result != null">
+              <debug_text text="'StandingOrders: last command %s result: %s'.[@$result.$command, $result]" chance="100" filter="scripts" />
+              <do_if value="@$result.$command == 'check_source' and @$result.$source != null">
+
+              </do_if>
+            </do_if>
+          </actions>
+        </cue>
+      </cues>
+    </cue>
+  </cues>
+</mdscript>
