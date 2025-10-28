@@ -5,7 +5,7 @@
       <t id="1">Standing Orders</t>
       <t id="10101">Select as Source</t>
       <t id="10110">Invalid Source Ship</t>
-      <t id="10111">Orders cannot be cloned from %s due to %s!</t>
+      <t id="10111">Orders cannot be cloned from '%s' due to %s!</t>
       <t id="10121">Invalid Ship ID</t>
       <t id="10122">Is not a Ship</t>
       <t id="10123">Not Owned by Player</t>
