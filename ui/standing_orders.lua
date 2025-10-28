@@ -5,37 +5,39 @@ ffi.cdef [[
   typedef uint64_t UniverseID;
 
   typedef struct {
-    float x;
-    float y;
-    float z;
-    float yaw;
-    float pitch;
-    float roll;
-  } UIPosRot;
+   size_t queueidx;
+   const char* state;
+   const char* statename;
+   const char* orderdef;
+   size_t actualparams;
+   bool enabled;
+   bool isinfinite;
+   bool issyncpointreached;
+   bool istemporder;
+  } Order;
 
-  UniverseID  GetPlayerID(void);
-  UIPosRot    GetPositionalOffset(UniverseID positionalid, UniverseID spaceid);
-  void        SpawnObjectAtPos(const char* macroname, UniverseID sectorid, UIPosRot offset);
-  UniverseID  SpawnObjectAtPos2(const char* macroname, UniverseID sectorid, UIPosRot offset, const char* ownerid);
-  void        SetObjectSectorPos(UniverseID objectid, UniverseID sectorid, UIPosRot offset);
-  void        SetObjectForcedRadarVisible(UniverseID objectid, bool value);
-  void        SetKnownTo(UniverseID componentid, const char* factionid);
-  bool        IsComponentClass(UniverseID componentid, const char* classname);
-  void        AddGateConnection(UniverseID gateid, UniverseID othergateid);
-  void        RemoveGateConnection(UniverseID gateid, UniverseID othergateid);
-  void        SetFocusMapComponent(UniverseID holomapid, UniverseID componentid, bool resetplayerpan);
-  void        SetSelectedMapComponent(UniverseID holomapid, UniverseID componentid);
-  void        SetSelectedMapComponents(UniverseID holomapid, UniverseID* componentids, uint32_t numcomponentids);
-  bool        SetSofttarget(UniverseID componentid, const char*const connectionname);
-  bool        FindMacro(const char* macroname);
-  uint32_t    GetNumMacrosStartingWith(const char* partialmacroname);
-  uint32_t    GetMacrosStartingWith(const char** result, uint32_t resultlen, const char* partialmacroname);
+  typedef struct {
+   const char* name;
+   const char* transport;
+   uint32_t spaceused;
+   uint32_t capacity;
+  } StorageInfo;
+
+	UniverseID GetPlayerID(void);
+  uint32_t GetOrders(Order* result, uint32_t resultlen, UniverseID controllableid);
+	uint32_t CreateOrder(UniverseID controllableid, const char* orderid, bool default);
+	bool EnableOrder(UniverseID controllableid, size_t idx);
 ]]
 
 local StandingOrders = {
   playerId = 0,
-  mapMenu = {}
+  mapMenu = {},
+  validOrders = {
+    SingleBuy  = true,
+    SingleSell = true,
+  },
 }
+
 
 local Lib = require("extensions.sn_mod_support_apis.ui.Library")
 
@@ -85,9 +87,15 @@ function StandingOrders.recordResult(data)
   end
 end
 
-function StandingOrders.reportError(data)
+function StandingOrders.reportError(data, extraInfo)
   local data = data or {}
   data.result = "error"
+  if extraInfo == nil then
+    extraInfo = {}
+  end
+  for k, v in pairs(extraInfo) do
+    data[k] = v
+  end
   StandingOrders.recordResult(data)
 
   local message = "StandingOrders error"
@@ -136,18 +144,39 @@ end
 function StandingOrders.checkShip(shipId)
   local shipId = toUniverseId(shipId)
   if shipId == 0 then
-    StandingOrders.reportError({ info = "InvalidShipID" })
-    return false
+    return false, { info = "InvalidShipID" }
   end
   local isShip = C.IsComponentClass(shipId, "ship")
   if not isShip then
-    StandingOrders.reportError({ info = "NotAShip" })
-    return false
+    return false, { info = "NotAShip" }
   end
   local owner = GetComponentData(shipId, "owner")
   if owner ~= "player" then
-    StandingOrders.reportError({ info = "NotPlayerShip", detail = "owner=" .. tostring(owner) })
-    return false
+    return false, { info = "NotPlayerShip", detail = "owner=" .. tostring(owner) }
+  end
+  if not C.IsComponentOperational(shipId) then
+    return false, { info = "ShipNotOperational" }
+  end
+  return true
+end
+
+function StandingOrders.isValidSourceShip(sourceId)
+  local sourceId = toUniverseId(sourceId)
+  local valid, errorData = StandingOrders.checkShip(sourceId)
+  if not valid then
+    return false, errorData
+  end
+  if StandingOrders.isLoopEnabled(sourceId) == false then
+    return false, { info = "LoopNotEnabled" }
+  end
+  local orders = StandingOrders.getStandingOrders(sourceId)
+  if #orders == 0 then
+    return false, { info = "NoStandingOrders" }
+  end
+  for _, order in ipairs(orders) do
+    if not StandingOrders.validOrders[order.order] then
+      return false, { info = "InvalidStandingOrder", detail = "order=" .. tostring(order.order) }
+    end
   end
   return true
 end
@@ -208,14 +237,21 @@ function StandingOrders.ProcessRequest(_, _)
     debugTrace("ProcessRequest received command: " .. tostring(args.command))
     if args.command == "mark_source" or args.command == "unmark_source" then
       StandingOrders.MarkSourceOnMap(args)
+    else if args.command == "check_source" then
+      local valid, errorData = StandingOrders.isValidSourceShip(args.source)
+      if valid then
+        args.info = "ValidSource"
+        StandingOrders.reportSuccess(args)
+      else
+        StandingOrders.reportError(args, errorData)
+      end
     else
       debugTrace("ProcessRequest received unknown command: " .. tostring(args.command))
-      args.info = "UnknownCommand"
-      StandingOrders.reportError(args)
+      StandingOrders.reportError(args, { info = "UnknownCommand" })
     end
   else
     debugTrace("ProcessRequest invoked but no MapMenu or Holomap available")
-    StandingOrders.reportError({ info = "NoMap" })
+    StandingOrders.reportError(args, { info = "NoMap" })
   end
 end
 
