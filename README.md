@@ -1,15 +1,15 @@
-# Trade Loop Manager
+# Standing Orders
 
-Provides an interface for managing Trade Loops—sequences of trade orders governed by the Repeat Orders behavior.
+Provides an interface for managing Standing Orders — sequences of trade orders governed by the Repeat Orders behavior.
 
 ## Features
 
-- Make possible to clone Trade Loops from one ship to another.
+- Make possible to clone Standing Orders from one ship to another.
 
 ## Installation
 
-You can download the latest version via Steam client - [Trade Loop Manager](https://steamcommunity.com/sharedfiles/filedetails/?id=)
-Or you can do it via the Nexus Mods - [Trade Loop Manager](https://www.nexusmods.com/x4foundations/mods/)
+You can download the latest version via Steam client - [Standing Orders](https://steamcommunity.com/sharedfiles/filedetails/?id=)
+Or you can do it via the Nexus Mods - [Standing Orders](https://www.nexusmods.com/x4foundations/mods/)
 
 ## Usage
 

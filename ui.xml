@@ -2,6 +2,6 @@
 <addon name="gate_manager" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../core/coreaddon.xsd">
   <environment type="menus">
     <dependency name="sn_mod_support_apis" />
-    <file name="ui/trade_loop_manager.lua" />
+    <file name="ui/standing_orders.lua" />
   </environment>
 </addon>

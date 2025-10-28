@@ -6,49 +6,49 @@
   date="2025-10-28"
   save="false"
   lastupdate="1760781920"
-  name="Trade Loop Manager"
-  description="Provides an interface for managing Trade Loops—sequences of trade orders governed by the Repeat Orders behavior.">
+  name="Standing Orders"
+  description="Provides an interface for managing Standing Orders — sequences of trade orders governed by the Repeat Orders behavior.">
   <text language="7"
-    description="Provides an interface for managing Trade Loops—sequences of trade orders governed by the Repeat Orders behavior."></text>
+    description="Provides an interface for managing Standing Orders — sequences of trade orders governed by the Repeat Orders behavior."></text>
   <!-- French -->
   <text language="33"
-    description="Fournit une interface pour gérer les boucles commerciales—des séquences d'ordres de commerce régies par le comportement Répéter les ordres."></text>
+    description="Fournit une interface pour gérer les Ordres Permanents — des séquences d’Ordres Commerciaux régies par le Comportement Répéter les Ordres."></text>
   <!-- Spanish -->
   <text language="34"
-    description="Proporciona una interfaz para gestionar los bucles comerciales, secuencias de órdenes de comercio gobernadas por el comportamiento Repetir órdenes."></text>
+    description="Proporciona una interfaz para gestionar Órdenes Permanentes: secuencias de Órdenes Comerciales gobernadas por el Comportamiento Repetir Órdenes."></text>
   <!-- Italian -->
   <text language="39"
-    description="Fornisce un'interfaccia per gestire i cicli commerciali, sequenze di ordini di scambio governate dal comportamento Ripeti ordini."></text>
+    description="Fornisce un'interfaccia per gestire gli Ordini Permanenti — sequenze di Istruzioni Commerciali governate dal Comportamento Ripeti Ordini."></text>
   <!-- Czech -->
   <text language="42"
-    description="Poskytuje rozhraní pro správu obchodních smyček—sekvencí obchodních příkazů řízených chováním Opakovat příkazy."></text>
+    description="Poskytuje rozhraní pro správu Stálých Příkazů — sekvencí Obchodních Pokynů řízených Chováním Opakovat Příkazy."></text>
   <!-- English -->
   <text language="44"
-    description="Provides an interface for managing Trade Loops—sequences of trade orders governed by the Repeat Orders behavior."></text>
+    description="Provides an interface for managing Standing Orders — sequences of trade orders governed by the Repeat Orders behavior."></text>
   <!-- Polish -->
   <text language="48"
-    description="Zapewnia interfejs do zarządzania pętlami handlowymi—sekwencjami zleceń handlowych kontrolowanymi przez zachowanie Powtarzaj rozkazy."></text>
+    description="Zapewnia interfejs do zarządzania Zleceniami Stałymi — sekwencjami Poleceń Handlowych kontrolowanymi przez Zachowanie Powtarzaj Rozkazy."></text>
   <!-- German -->
   <text language="49"
-    description="Bietet eine Oberfläche zur Verwaltung von Handelsschleifen—Abfolgen von Handelsaufträgen, die durch das Verhalten 'Aufträge wiederholen' gesteuert werden."></text>
+    description="Bietet eine Oberfläche zur Verwaltung von Daueraufträgen — Abfolgen von Handelsaufträgen, die durch das Verhalten „Aufträge Wiederholen“ gesteuert werden."></text>
   <!-- Portuguese -->
   <text language="55"
-    description="Fornece uma interface para gerenciar Loops de Comércio—sequências de ordens de comércio governadas pelo comportamento Repetir Ordens."></text>
+    description="Fornece uma interface para gerenciar Ordens Permanentes — sequências de Ordens de Comércio regidas pelo Comportamento Repetir Ordens."></text>
   <!-- Japanese -->
-  <text language="81" description="トレードループ――リピートオーダーの挙動によって制御される取引命令の連続――を管理するためのインターフェースを提供します。"></text>
+  <text language="81" description="スタンディングオーダー――リピートオーダー挙動によって制御される取引命令の連続――を管理するためのインターフェースを提供します。"></text>
   <!-- Korean -->
-  <text language="82" description="반복 명령 행동에 의해 제어되는 거래 주문 시퀀스인 무역 루프를 관리하기 위한 인터페이스를 제공합니다."></text>
+  <text language="82" description="반복 명령 행동으로 제어되는 거래 주문 연속인 스탠딩 오더를 관리하기 위한 인터페이스를 제공합니다."></text>
   <!-- Chinese -->
-  <text language="86" description="提供一个界面，用于管理贸易循环——受重复指令行为控制的交易指令序列。"></text>
+  <text language="86" description="提供一个界面，用于管理常驻指令——由重复指令行为控制的交易指令序列。"></text>
   <!-- Bengali -->
   <text language="88"
-    description="বাণিজ্য লুপ পরিচালনার জন্য একটি ইন্টারফেস সরবরাহ করে—যা পুনরাবৃত্তি আদেশ আচরণ দ্বারা নিয়ন্ত্রিত বাণিজ্য আদেশের ধারাবাহিকতা।"></text>
+    description="স্ট্যান্ডিং অর্ডার পরিচালনার জন্য একটি ইন্টারফেস সরবরাহ করে—যা পুনরাবৃত্তি আদেশ আচরণ দ্বারা নিয়ন্ত্রিত বাণিজ্য আদেশের ধারাবাহিকতা।"></text>
   <!-- Turkish -->
   <text language="90"
-    description="Ticaret Döngülerini—Tekrar Emirleri davranışı tarafından yönetilen ticaret emir dizilerini—yönetmek için bir arayüz sağlar."></text>
+    description="Tekrar Emirleri Davranışı tarafından yönetilen Ticaret Emir dizileri olan Sürekli Emirleri yönetmek için bir arayüz sağlar."></text>
   <!-- Ukrainian -->
   <text language="380"
-    description="Надає інтерфейс для керування торговельними циклами—послідовностями торгових наказів, що контролюються поведінкою «Повторювати накази»."></text>
+    description="Надає інтерфейс для керування Сталими Наказами — послідовностями Торгових Наказів, що контролюються Поведінкою «Повторювати Накази»."></text>
   <dependency version="760"></dependency>
   <dependency id="ws_2042901274" optional="false" name="SirNukes Mod Support APIs" version="193"></dependency>
 </content>
