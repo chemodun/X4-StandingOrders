@@ -83,7 +83,7 @@
 
             <set_value name="$args"
               exact="table[
-                $command            = 'check_source',
+                $command            = 'mark_source',
                 $source             = @event.param.$object,
                 ]" />
             <do_if value="$args != null">
@@ -112,8 +112,10 @@
             <debug_text text="'StandingOrders: Process_Results invoked with result: %s'.[$result]" chance="100" filter="scripts" />
             <do_if value="$result? and @$result != null">
               <debug_text text="'StandingOrders: last command %s result: %s'.[@$result.$command, $result]" chance="100" filter="scripts" />
-              <do_if value="@$result.$command == 'check_source' and @$result.$source != null">
-
+              <do_if value="@$result.$command == 'mark_source' and @$result.$source != null">
+                <do_if value="@$result.$result == 'success' and @$result.$source != null">
+                  <set_holomap_target object="@$result.$source" instant="true" />
+                </do_if>
               </do_if>
             </do_if>
           </actions>
