@@ -78,12 +78,22 @@ local function toUniverseId(value)
   return ConvertStringTo64Bit(idStr)
 end
 
+local function readTextOrFallback(page, id, fallback)
+  if type(ReadText) == "function" then
+    local ok, value = pcall(ReadText, page, id)
+    if ok and type(value) == "string" and value ~= "" then
+      return value
+    end
+  end
+  return fallback
+end
+
 function StandingOrders.recordResult(data)
   debugTrace("recordResult called for command ".. tostring(data and data.command) .. " with result " .. tostring(data and data.result))
   if StandingOrders.playerId ~= 0 then
     local payload = data or {}
     SetNPCBlackboard(StandingOrders.playerId, "$StandingOrdersResponse", payload)
-    AddUITriggeredEvent("Trade_Loop_Manager", "Response")
+    AddUITriggeredEvent("StandingOrders", "Response")
   end
 end
 
@@ -226,6 +236,127 @@ function StandingOrders.MarkSourceOnMap(args)
   StandingOrders.reportSuccess(args)
 end
 
+
+function StandingOrders.showSourceAlert(source, errorData)
+
+  local sourceId = toUniverseId(source)
+
+  local sourceName = GetComponentData(ConvertStringToLuaID(tostring(source)), "name")
+  local options = {}
+  options.title = ReadText(1972092408, 10111)
+  local details = "error"
+  if errorData and type(errorData) == "table" and errorData.info then
+    if errorData.info == "InvalidShipID" then
+      details = ReadText(1972092408, 10121)
+    elseif errorData.info == "NotAShip" then
+      details = ReadText(1972092408, 10122)
+    elseif errorData.info == "NotPlayerShip" then
+      details = ReadText(1972092408, 10123)
+    elseif errorData.info == "ShipNotOperational" then
+      details = ReadText(1972092408, 10124)
+    elseif errorData.info == "LoopNotEnabled" then
+      details = ReadText(1972092408, 10131)
+    elseif errorData.info == "NoStandingOrders" then
+      details = ReadText(1972092408, 10132)
+    elseif errorData.info == "InvalidStandingOrder" then
+      details = ReadText(1972092408, 10133)
+    end
+  end
+  local message = string.format(ReadText(1972092408, 10111), sourceName, details)
+  options.message = message
+
+  StandingOrders.alertMessage(options)
+end
+
+
+function StandingOrders.alertMessage(options)
+  local menu = StandingOrders.mapMenu
+  if type(menu) ~= "table" or type(menu.closeContextMenu) ~= "function" then
+    debugTrace("alertMessage: Invalid menu instance")
+    return false, "Map menu instance is not available"
+  end
+  if type(Helper) ~= "table" then
+    debugTrace("alertMessage: Helper UI utilities are not available")
+    return false, "Helper UI utilities are not available"
+  end
+
+  if type(options) ~= "table" then
+    return false, "Options parameter is not a table"
+  end
+
+  if options.title == nil then
+    return false, "Title option is required"
+  end
+
+  if options.message == nil then
+    return false, "Message option is required"
+  end
+
+  local width = options.width or Helper.scaleX(400)
+  local xoffset = options.xoffset or (Helper.viewWidth - width) / 2
+  local yoffset = options.yoffset or Helper.viewHeight / 2
+  local okLabel = options.okLabel or ReadText(1001, 14)
+
+  local title = options.title
+  local message = options.message
+
+  local onClose = options.onClose
+
+  menu.closeContextMenu()
+
+  menu.contextMenuMode = "standing_orders_alert"
+  menu.contextMenuData = {
+    mode = "standing_orders_alert",
+    width = width,
+    xoffset = xoffset,
+    yoffset = yoffset,
+  }
+
+  local contextLayer = menu.contextFrameLayer or 2
+
+  menu.contextFrame = Helper.createFrameHandle(menu, {
+    x = xoffset - 2 * Helper.borderSize,
+    y = yoffset,
+    width = width + 2 * Helper.borderSize,
+    layer = contextLayer,
+    standardButtons = { close = true },
+    closeOnUnhandledClick = true,
+  })
+  local frame = menu.contextFrame
+  frame:setBackground("solid", { color = Color["frame_background_semitransparent"] })
+
+  local ftable = frame:addTable(5, { tabOrder = 5, reserveScrollBar = false, highlightMode = "off" })
+
+  local headerRow = ftable:addRow(false, { fixed = true })
+  headerRow[1]:setColSpan(5):createText(title, Helper.headerRowCenteredProperties)
+
+  ftable:addEmptyRow(Helper.standardTextHeight / 2)
+
+  local messageRow = ftable:addRow(false, { fixed = true })
+  messageRow[1]:setColSpan(5):createText(message, Helper.headerRowCenteredProperties)
+
+  ftable:addEmptyRow(Helper.standardTextHeight / 2)
+
+  local buttonRow = ftable:addRow(true, { fixed = true })
+  buttonRow[3]:createButton():setText(okLabel, { halign = "center" })
+  buttonRow[3].handlers.onClick = function ()
+    local shouldClose = true
+    if type(onClose) == "function" then
+      shouldClose = onClose(menu, sourceId) ~= false
+    end
+    if shouldClose then
+      menu.closeContextMenu("back")
+    end
+  end
+  ftable:setSelectedCol(3)
+
+  frame.properties.height = math.min(Helper.viewHeight - frame.properties.y, frame:getUsedHeight() + Helper.borderSize)
+
+  frame:display()
+
+  return true
+end
+
 function StandingOrders.ProcessRequest(_, _)
   if StandingOrders.mapMenu and StandingOrders.mapMenu.holomap and (StandingOrders.mapMenu.holomap ~= 0) then
     local args = StandingOrders.getArgs()
@@ -235,16 +366,16 @@ function StandingOrders.ProcessRequest(_, _)
       return
     end
     debugTrace("ProcessRequest received command: " .. tostring(args.command))
-    if args.command == "mark_source" or args.command == "unmark_source" then
-      StandingOrders.MarkSourceOnMap(args)
-    else if args.command == "check_source" then
+    if args.command == "mark_source" then
       local valid, errorData = StandingOrders.isValidSourceShip(args.source)
       if valid then
-        args.info = "ValidSource"
-        StandingOrders.reportSuccess(args)
+        StandingOrders.MarkSourceOnMap(args)
       else
+        StandingOrders.showSourceAlert(args.source, errorData)
         StandingOrders.reportError(args, errorData)
       end
+    elseif args.command == "unmark_source" then
+      StandingOrders.MarkSourceOnMap(args)
     else
       debugTrace("ProcessRequest received unknown command: " .. tostring(args.command))
       StandingOrders.reportError(args, { info = "UnknownCommand" })
@@ -259,7 +390,7 @@ function StandingOrders.Init()
   getPlayerId()
   ---@diagnostic disable-next-line: undefined-global
   RegisterEvent("StandingOrders.Request", StandingOrders.ProcessRequest)
-  AddUITriggeredEvent("Trade_Loop_Manager", "Reloaded")
+  AddUITriggeredEvent("StandingOrders", "Reloaded")
   StandingOrders.mapMenu = Lib.Get_Egosoft_Menu("MapMenu")
   debugTrace("MapMenu is " .. tostring(StandingOrders.mapMenu))
 end
