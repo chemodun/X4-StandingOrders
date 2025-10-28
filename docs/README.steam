@@ -1,0 +1,33 @@
+[h1]Standing Orders[/h1]
+
+Provides an interface for managing Standing Orders — sequences of trade orders governed by the Repeat Orders behavior.
+
+[h2][b]Features[/b][/h2]
+[list]
+[*] Make possible to clone Standing Orders from one ship to another.
+[/list]
+[h2][b]Installation[/b][/h2]
+
+You can download the latest version via Steam client - [url=https://steamcommunity.com/sharedfiles/filedetails/?id=]Standing Orders[/url]
+Or you can do it via the Nexus Mods - [url=https://www.nexusmods.com/x4foundations/mods/]Standing Orders[/url]
+
+[h2][b]Usage[/b][/h2]
+
+[h2][b]Credits[/b][/h2]
+[list]
+[*] Author: Chem O`Dun, on [url=https://next.nexusmods.com/profile/ChemODun/mods?gameId=2659]Nexus Mods[/url] and [url=https://steamcommunity.com/id/chemodun/myworkshopfiles/?appid=392160]Steam Workshop[/url]
+[*] [i]"X4: Foundations"[/i] is a trademark of [url=https://www.egosoft.com]Egosoft[/url].
+[/list]
+[h2][b]Acknowledgements[/b][/h2]
+[list]
+[*] [url=https://www.egosoft.com]EGOSOFT[/url] - for the game itself (In fact - for the series of games)!
+[/list]
+[h2][b]Changelog[/b][/h2]
+
+[h2][1.00] - 2025-10-2?[/h2]
+[list]
+[*] Added
+[list]
+[*] Initial public version
+[/list]
+[/list]
