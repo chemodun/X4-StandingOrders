@@ -243,7 +243,7 @@ function StandingOrders.showSourceAlert(source, errorData)
 
   local sourceName = GetComponentData(ConvertStringToLuaID(tostring(source)), "name")
   local options = {}
-  options.title = ReadText(1972092408, 10111)
+  options.title = ReadText(1972092408, 10110)
   local details = "error"
   if errorData and type(errorData) == "table" and errorData.info then
     if errorData.info == "InvalidShipID" then
@@ -328,12 +328,19 @@ function StandingOrders.alertMessage(options)
   local ftable = frame:addTable(5, { tabOrder = 5, reserveScrollBar = false, highlightMode = "off" })
 
   local headerRow = ftable:addRow(false, { fixed = true })
-  headerRow[1]:setColSpan(5):createText(title, Helper.headerRowCenteredProperties)
+  headerRow[1]:setColSpan(5):createText(title, Helper.titleTextProperties)
 
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
   local messageRow = ftable:addRow(false, { fixed = true })
-  messageRow[1]:setColSpan(5):createText(message, Helper.headerRowCenteredProperties)
+  messageRow[1]:setColSpan(5):createText(message, {
+    halign = "center",
+    valign = "top",
+    wordwrap = true,
+    color = Color["text_normal"],
+    fontname = Helper.standardFont,
+    fontsize = Helper.standardFontSize,
+  })
 
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
