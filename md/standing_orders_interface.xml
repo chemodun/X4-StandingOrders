@@ -45,47 +45,52 @@
             <check_value value="@event.param.$object.iswreck" negate="true" />
           </conditions>
           <actions>
-            <set_value name="$params" exact="event.param" />
-            <set_value name="$args" exact="null" />
-            <set_value name="$menuSection" exact="'interaction'" />
-            <do_if value="@$params.$selectedplayerships.count gt 0">
-              <set_value name="$menuSection" exact="'trade_orders'" />
-            </do_if>
+            <set_value name="$params" exact="@event.param" />
+            <debug_text
+              text="'StandingOrders: sourceShipForCloning: %s, selectedplayerships.count: %s'.[@$sourceShipForCloning, @$params.$selectedplayerships.count]"
+              chance="100" filter="scripts" />
             <do_if value="@$sourceShipForCloning == null">
               <debug_text text="'StandingOrders: Updating interaction menu actions to add Source Selection'" chance="100"
                 filter="scripts" />
-
-              <signal_cue_instantly
-                cue="md.Interact_Menu_API.Add_Action"
-                param="table[
+              <do_if value="@$params.$selectedplayerships.count gt 0" negate="true">
+                <signal_cue_instantly
+                  cue="md.Interact_Menu_API.Add_Action"
+                  param="table[
                   $id         = 'player_standing_orders_select_source',
-                  $section    = $menuSection,
+                  $section    = 'interaction',
                   $text       = '[&#8734;]: %s'.[{1972092408, 10101}],
                   $mouseover  = '[%s]: %s'.[{1972092408, 1}, {1972092408, 10101}],
                   $icon       = 'menu_export',
                   $active     = true,
                   $callback   =  Process_Menu
                 ]" />
+              </do_if>
             </do_if>
             <do_elseif value="@$sourceShipForCloning == @event.param.$object">
               <debug_text text="'StandingOrders: Updating interaction menu actions to add Deselect Source Selection'" chance="100"
                 filter="scripts" />
-              <signal_cue_instantly
-                cue="md.Interact_Menu_API.Add_Action"
-                param="table[
+              <do_if value="@$params.$selectedplayerships.count gt 0" negate="true">
+                <signal_cue_instantly
+                  cue="md.Interact_Menu_API.Add_Action"
+                  param="table[
                   $id         = 'player_standing_orders_deselect_source',
-                  $section    = $menuSection,
+                  $section    = 'interaction',
                   $text       = '[&#8734;]: %s'.[{1972092408, 10201}],
                   $mouseover  = '[%s]: %s'.[{1972092408, 1}, {1972092408, 10201}],
                   $icon       = 'menu_reset',
                   $active     = true,
                   $callback   =  Process_Menu
                 ]" />
+              </do_if>
             </do_elseif>
             <do_else>
               <debug_text text="'StandingOrders: Source selected is different from current source. Can be a target for cloning.'" chance="100"
                 filter="scripts" />
               <set_value name="$sourceFullName" exact="@$sourceShipForCloning.name + ' (' + @$sourceShipForCloning.idcode + ')'" />
+              <set_value name="$menuSection" exact="'interaction'" />
+              <do_if value="@$params.$selectedplayerships.count gt 0">
+                <set_value name="$menuSection" exact="'trade_orders'" />
+              </do_if>
               <signal_cue_instantly
                 cue="md.Interact_Menu_API.Add_Action"
                 param="table[
