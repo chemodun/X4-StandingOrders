@@ -69,7 +69,7 @@
                   $mouseover  = {1972092408, 10101},
                   $icon       = 'mapst_fs_trade',
                   $active     = true,
-                  $callback   =  Process_Source
+                  $callback   =  Process_Menu
                 ]" />
             </do_if>
             <do_elseif value="@$sourceShipForCloning == @event.param.$object">
@@ -84,23 +84,58 @@
                   $mouseover  = {1972092408, 10201},
                   $icon       = 'menu_reset',
                   $active     = true,
-                  $callback   =  Process_Source
+                  $callback   =  Process_Menu
                 ]" />
             </do_elseif>
+            <do_else>
+              <debug_text text="'StandingOrders: Source selected is different from current source. Can be a target for cloning.'" chance="100"
+                filter="scripts" />
+              <signal_cue_instantly
+                cue="md.Interact_Menu_API.Add_Action"
+                param="table[
+                  $id         = 'player_standing_orders_clone',
+                  $section    = 'interaction',
+                  $text       = {1972092408, 10301}.[@$sourceShipForCloning.name],
+                  $mouseover  = {1972092408, 10301}.[@$sourceShipForCloning.name],
+                  $icon       = 'menu_reset',
+                  $active     = true,
+                  $callback   =  Process_Menu
+                ]" />
+            </do_else>
           </actions>
         </cue>
 
-        <cue name="Process_Source" instantiate="true">
+        <cue name="Process_Menu" instantiate="true">
           <conditions>
             <event_cue_signalled />
           </conditions>
           <actions>
-            <debug_text text="'StandingOrders: Process_Source invoked with param: %s'.[event.param]" chance="100" filter="scripts" />
-            <set_value name="$args"
-              exact="table[
-                $command            = if event.param.$id == 'player_standing_orders_select_source' then 'mark_source' else 'unmark_source',
-                $source             = @event.param.$object,
+            <debug_text text="'StandingOrders: Process_Menu invoked with param: %s'.[event.param]" chance="100" filter="scripts" />
+            <set_value name="$args" exact="null" />
+            <do_if value="@event.param.$id == 'player_standing_orders_select_source' or @event.param.$id == 'player_standing_orders_deselect_source'">
+              <set_value name="$sourceShipForCloning" exact="null" />
+              <debug_text text="'StandingOrders: Deselected source for cloning. Current source: %s'.[@$sourceShipForCloning]" chance="100"
+                filter="scripts" />
+              <set_value name="$args"
+                exact="table[
+                  $command            = if @event.param.$id == 'player_standing_orders_select_source' then 'mark_source' else 'unmark_source',
+                  $source             = @event.param.$object,
                 ]" />
+            </do_if>
+            <do_elseif value="@event.param.$id == 'player_standing_orders_clone'">
+              <do_if value="@$sourceShipForCloning != null">
+                <create_list name="$targetList" />
+                <append_to_list name="$targetList" exact="@event.param.$object" />
+                <set_value name="$args"
+                  exact="table[
+                    $command            = 'clone_orders',
+                    $source             = @$sourceShipForCloning,
+                    $targets            = $targetList,
+                  ]" />
+                <debug_text text="'StandingOrders: Prepared clone_orders with source: %s and target: %s'.[@$sourceShipForCloning, @event.param.$object]"
+                  chance="100" filter="scripts" />
+              </do_if>
+            </do_elseif>
             <do_if value="$args != null">
               <do_if value="not player.entity.$StandingOrdersRequest?">
                 <set_value name="player.entity.$StandingOrdersRequest" exact="[]" />
