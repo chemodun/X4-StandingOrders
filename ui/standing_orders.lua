@@ -37,6 +37,7 @@ ffi.cdef [[
 	UniverseID GetPlayerID(void);
 
 	bool GetOrderDefinition(OrderDefinition* result, const char* orderdef);
+	const char* GetObjectIDCode(UniverseID objectid);
 	bool IsComponentClass(UniverseID componentid, const char* classname);
 	bool IsComponentOperational(UniverseID componentid);
 	bool IsComponentWrecked(UniverseID componentid);
@@ -109,6 +110,15 @@ local function copyAndEnrichTable(src, extraInfo)
     dest[k] = v
   end
   return dest
+end
+
+local function getShipName(shipId)
+  if shipId == 0 then
+    return "Unknown"
+  end
+  local name = GetComponentData(ConvertStringToLuaID(tostring(shipId)), "name")
+  local idCode = ffi.string(C.GetObjectIDCode(shipId))
+  return string.format("%s (%s)", name, idCode)
 end
 
 function StandingOrders.recordResult()
@@ -303,7 +313,7 @@ function StandingOrders.showSourceAlert(errorData)
 
   local sourceId = toUniverseId(StandingOrders.args.source)
 
-  local sourceName = GetComponentData(ConvertStringToLuaID(tostring(sourceId)), "name")
+  local sourceName = getShipName(sourceId)
   local options = {}
   options.title = ReadText(1972092408, 10110)
   local details = "error"
@@ -480,7 +490,7 @@ function StandingOrders.cloneOrdersConfirm()
   local sourceId = StandingOrders.sourceId
   local targetIds = StandingOrders.targetIds
 
-  local sourceName = GetComponentData(ConvertStringToLuaID(tostring(sourceId)), "name")
+  local sourceName = getShipName(sourceId)
   local title = ReadText(1972092408, 10320)
   local sourceTitle = string.format(ReadText(1972092408, 10321), sourceName)
   local targetsTitle = ReadText(1972092408, 10322)
@@ -540,7 +550,7 @@ function StandingOrders.cloneOrdersConfirm()
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
   local orders = StandingOrders.getStandingOrders(sourceId)
-
+  local cargoCapacity = StandingOrders.getCargoCapacity(sourceId)
   local lineCount = math.max(#orders, #targetIds)
   for i = 1, lineCount do
     local row = ftable:addRow(false)
@@ -549,7 +559,12 @@ function StandingOrders.cloneOrdersConfirm()
       local orderparams = GetOrderParams(sourceId, order.idx)
       row[1]:createText(StandingOrders.validOrders[order.order], {halign = "left"})
       row[2]:setColSpan(2):createText(GetWareData(orderparams[1].value, "name"), {halign = "left"})
-      row[4]:createText(math.floor(orderparams[5].value), {halign = "right"})
+      local amount = math.floor(orderparams[5].value)
+      if order.order == "SingleSell" then
+        amount = cargoCapacity - amount
+      end
+      local percentage = (cargoCapacity > 0) and (amount * 100 / cargoCapacity ) or 0
+      row[4]:createText(string.format("%.2f%%", percentage), {halign = "right"})
       row[5]:createText(math.floor(orderparams[7].value), {halign = "right"})
       local locations = orderparams[4].value
       if type(locations) == "table" and #locations >= 1 then
@@ -566,13 +581,14 @@ function StandingOrders.cloneOrdersConfirm()
       row[1]:setColSpan(8):createText("", {halign = "left"})
     end
     if i <= #targetIds then
-      local targetName = GetComponentData(ConvertStringToLuaID(tostring(targetIds[i])), "name")
+      local targetName = getShipName(targetIds[i])
       row[9]:setColSpan(4):createText(tostring(targetName), {halign = "left"})
     else
       row[9]:setColSpan(4):createText("", {halign = "center"})
     end
   end
 
+  ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
   local buttonRow = ftable:addRow(true, { fixed = true })
   buttonRow[9]:setColSpan(2):createButton():setText(ReadText(1001, 2821), { halign = "center" })
