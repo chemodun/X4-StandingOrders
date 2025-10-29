@@ -1,10 +1,21 @@
 [size=4][u]Standing Orders[/u][/size]
 
-Provides an interface for managing Standing Orders — sequences of trade orders governed by the Repeat Orders behavior.
+Standing Orders adds a lightweight interface that lets you clone Repeat Orders trade queues from one of player's ship to any number of other player-owned ships.
 
 [size=3][u][b]Features[/b][/u][/size]
 [list]
-[*] Make possible to clone Standing Orders from one ship to another.
+[*] Clone a ship’s running Repeat Orders (currently Single Buy/Sell) onto any selection of eligible targets in a single confirmation step.
+[*] Works only with [b]Container[/b] type of cargo.
+[*] Automatically scales cargo amounts to each target’s hold size while preserving wares, prices, and destinations.
+[/list]
+[size=3][u][b]Requirements[/b][/u][/size]
+[list]
+[*] [b]X4: Foundations[/b] 7.60 or newer (tested on 7.60 and 8.00).
+[*] [b]Mod Support APIs[/b] by [url=https://next.nexusmods.com/profile/sirnukes?gameId=2659]SirNukes[/url] to be installed and enabled. Version [b]1.93[/b] and upper is required.
+[list]
+[*] It is available via Steam - [url=https://steamcommunity.com/sharedfiles/filedetails/?id=2042901274]SirNukes Mod Support APIs[/url]
+[*] Or via the Nexus Mods - [url=https://www.nexusmods.com/x4foundations/mods/503]Mod Support APIs[/url]
+[/list]
 [/list]
 [size=3][u][b]Installation[/b][/u][/size]
 
@@ -13,6 +24,68 @@ Or you can do it via the Nexus Mods - [url=https://www.nexusmods.com/x4foundatio
 
 [size=3][u][b]Usage[/b][/u][/size]
 
+This mods adds a several context menu options to the map UI when you right-click on a player-owned ships.
+
+[img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/repeat_orders_example.png[/img]
+
+[size=3][u][i]Selecting Source Ship[/i][/u][/size]
+
+To select a source ship (the one whose Repeat Orders you want to clone), right-click on it in the map view and choose [b][∞]: Select as Source[/b] from the context menu.
+[img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/select_as_source.png[/img]
+
+You will get warning messages if source ship is invalid. Some examples:
+[list]
+[*] the selected ship does not have any valid cargo.
+[/list]
+  [img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/no_valid_cargo.png[/img]
+[list]
+[*] the selected ship has no active Repeat Orders enabled.
+[/list]
+  [img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/no_repeat_orders_enabled.png[/img]
+
+If the source ship is valid, map will be centered on it and ship will be selected on a map.
+
+[size=3][u][i]Selecting Target Ships for Cloning Orders[/i][/u][/size]
+
+To clone the Repeat Orders from the selected source ship to other player-owned ships, simple select them on a map or in the list, then right-click and choose [b][∞]: Clone Standing Orders from <source ship>[/b] from the context menu.
+
+[img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/clone_context_menu.png[/img]
+
+Again, you will get warning messages if no valid target ships are selected.
+
+[img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/no_valid_targets.png[/img]
+
+[size=3][u][i]Confirming Cloning[/i][/u][/size]
+
+After selecting valid target ships, you will get a confirmation dialog showing the summary of the cloning operation.
+
+[img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/clone_confirmation_dialog.png[/img]
+
+You can confirm or cancel the operation.
+In addition, you can [b]Deselect as Source[/b] ship if you want to choose a different source ship.
+
+[size=3][u][i]Deselecting Source Ship[/i][/u][/size]
+
+To deselect the current source ship, right-click on it in the map view and choose [b][∞]: Deselect as Source[/b] from the context menu.
+
+[img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/deselect_source_ship.png[/img]
+
+[size=3][u][i]Result of Cloning[/i][/u][/size]
+
+After confirming the cloning operation, the selected target ships will receive the cloned Repeat Orders from the source ship.
+
+[size=3][u]Before Cloning[/u][/size]
+
+[img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/first_target_before_cloning.png[/img]
+[img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/second_target_before_cloning.png[/img]
+
+[size=3][u]After Cloning[/u][/size]
+
+[img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/first_target_after_cloning.png[/img]
+[img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/second_target_after_cloning.png[/img]
+
+You can compare it with example of the source ship's Repeat Orders shown at the beginning of [b]Usage[/b] chapter.
+
 [size=3][u][b]Credits[/b][/u][/size]
 [list]
 [*] Author: Chem O`Dun, on [url=https://next.nexusmods.com/profile/ChemODun/mods?gameId=2659]Nexus Mods[/url] and [url=https://steamcommunity.com/id/chemodun/myworkshopfiles/?appid=392160]Steam Workshop[/url]
@@ -20,11 +93,13 @@ Or you can do it via the Nexus Mods - [url=https://www.nexusmods.com/x4foundatio
 [/list]
 [size=3][u][b]Acknowledgements[/b][/u][/size]
 [list]
-[*] [url=https://www.egosoft.com]EGOSOFT[/url] - for the game itself (In fact - for the series of games)!
+[*] [url=https://www.egosoft.com]EGOSOFT[/url] — for the X series.
+[*] [url=https://next.nexusmods.com/profile/sirnukes?gameId=2659]SirNukes[/url] — for the Mod Support APIs that power the UI hooks.
+[*] [url=https://next.nexusmods.com/profile/Forleyor?gameId=2659]Forleyor[/url] — for his constant help with understanding the UI modding!
 [/list]
 [size=3][u][b]Changelog[/b][/u][/size]
 
-[size=3][u][i][1.00] - 2025-10-2?[/i][/u][/size]
+[size=3][u][i][1.00] - 2025-10-30[/i][/u][/size]
 [list]
 [*] Added
 [list]
