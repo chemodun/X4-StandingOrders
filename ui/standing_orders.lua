@@ -27,6 +27,8 @@ ffi.cdef [[
 	bool IsComponentClass(UniverseID componentid, const char* classname);
 	bool IsComponentOperational(UniverseID componentid);
 	bool IsComponentWrecked(UniverseID componentid);
+	uint32_t GetNumCargoTransportTypes(UniverseID containerid, bool merge);
+	uint32_t GetCargoTransportTypes(StorageInfo* result, uint32_t resultlen, UniverseID containerid, bool merge, bool aftertradeorders);
 	size_t GetOrderQueueFirstLoopIdx(UniverseID controllableid, bool* isvalid);
   uint32_t GetOrders(Order* result, uint32_t resultlen, UniverseID controllableid);
 	uint32_t CreateOrder(UniverseID controllableid, const char* orderid, bool default);
@@ -40,6 +42,8 @@ local StandingOrders = {
     SingleBuy  = true,
     SingleSell = true,
   },
+  sourceId = 0,
+  targetIds = {},
 }
 
 
@@ -171,11 +175,31 @@ function StandingOrders.checkShip(shipId)
   if not C.IsComponentOperational(shipId) or C.IsComponentWrecked(shipId) then
     return false, { info = "ShipNotOperational" }
   end
+  if StandingOrders.getCargoCapacity(shipId) == 0 then
+    return false, { info = "NoCargoCapacity" }
+  end
   return true
 end
 
-function StandingOrders.isValidSourceShip(sourceId)
-  local sourceId = toUniverseId(sourceId)
+function StandingOrders.getCargoCapacity(shipId)
+  local menu = StandingOrders.mapMenu
+  local shipId = toUniverseId(shipId)
+  local numStorages = C.GetNumCargoTransportTypes(shipId, true)
+  local buf = ffi.new("StorageInfo[?]", numStorages)
+  local count = C.GetCargoTransportTypes(buf, numStorages, shipId, true, false)
+  local capacity = 0
+  for i = 0, count - 1 do
+    local tags = menu.getTransportTagsFromString(ffi.string(buf[i].transport))
+    if tags.container == true then
+      capacity = capacity + buf[i].capacity
+    end
+  end
+  return capacity
+end
+
+
+function StandingOrders.isValidSourceShip(source)
+  local sourceId = toUniverseId(source)
   local valid, errorData = StandingOrders.checkShip(sourceId)
   if not valid then
     return false, errorData
@@ -194,6 +218,22 @@ function StandingOrders.isValidSourceShip(sourceId)
   end
   return true
 end
+
+function StandingOrders.isValidTargetShip(target)
+  local targetId = toUniverseId(target)
+  local valid, errorData = StandingOrders.checkShip(targetId)
+  if not valid then
+    return false, errorData
+  end
+  local loopSkill = C.GetOrderLoopSkillLimit() * 3;
+  local aiPilot = GetComponentData(ConvertStringToLuaID(tostring(targetId)), "assignedaipilot")
+	local aiPilotSkill = aiPilot and math.floor(C.GetEntityCombinedSkill(ConvertIDTo64Bit(aiPilot), nil, "aipilot")) or -1
+  if aiPilotSkill < loopSkill then
+    return false, { info = "TargetPilotSkillTooLow", detail = "skill=" .. tostring(aiPilotSkill) .. ", required=" .. tostring(loopSkill) }
+  end
+  return true
+end
+
 
 function StandingOrders.getArgs()
   if StandingOrders.playerId == 0 then
@@ -258,6 +298,8 @@ function StandingOrders.showSourceAlert(source, errorData)
       details = ReadText(1972092408, 10123)
     elseif errorData.info == "ShipNotOperational" then
       details = ReadText(1972092408, 10124)
+    elseif errorData.info == "NoCargoCapacity" then
+      details = ReadText(1972092408, 10125)
     elseif errorData.info == "LoopNotEnabled" then
       details = ReadText(1972092408, 10131)
     elseif errorData.info == "NoStandingOrders" then
@@ -329,7 +371,7 @@ function StandingOrders.alertMessage(options)
   local frame = menu.contextFrame
   frame:setBackground("solid", { color = Color["frame_background_semitransparent"] })
 
-  local ftable = frame:addTable(5, { tabOrder = 5, reserveScrollBar = false, highlightMode = "off" })
+  local ftable = frame:addTable(5, { tabOrder = 1, x = Helper.borderSize, y = Helper.borderSize, width = width, reserveScrollBar = false, highlightMode = "off" })
 
   local headerRow = ftable:addRow(false, { fixed = true })
   headerRow[1]:setColSpan(5):createText(title, Helper.titleTextProperties)
@@ -368,6 +410,172 @@ function StandingOrders.alertMessage(options)
   return true
 end
 
+function StandingOrders.showTargetAlert()
+  local options = {}
+  options.title = ReadText(1972092408, 10310)
+  options.message = ReadText(1972092408, 10311)
+  StandingOrders.alertMessage(options)
+end
+
+
+function StandingOrders.cloneOrdersPrepare(args)
+  local valid, errorData = StandingOrders.isValidSourceShip(args.source)
+  if not valid then
+    StandingOrders.showSourceAlert(args.source, errorData)
+    return false, errorData
+  end
+  StandingOrders.sourceId = toUniverseId(args.source)
+  local targets = args.targets or {}
+  local targetIds = {}
+  for i = 1, #targets do
+    local targetId = toUniverseId(targets[i])
+    local valid, errorData = StandingOrders.isValidTargetShip(targetId)
+    if valid then
+      targetIds[#targetIds + 1] = targetId
+    end
+  end
+  if #targetIds == 0 then
+    StandingOrders.sourceId = 0
+    StandingOrders.showTargetAlert()
+    return false, { info = "NoValidTargets" }
+  end
+  StandingOrders.targetIds = targetIds
+  return true
+end
+
+
+
+function StandingOrders.cloneOrdersConfirm()
+  local menu = StandingOrders.mapMenu
+  if type(menu) ~= "table" or type(menu.closeContextMenu) ~= "function" then
+    debugTrace("alertMessage: Invalid menu instance")
+    return false, "Map menu instance is not available"
+  end
+  if type(Helper) ~= "table" then
+    debugTrace("alertMessage: Helper UI utilities are not available")
+    return false, "Helper UI utilities are not available"
+  end
+
+  local sourceId = StandingOrders.sourceId
+  local targetIds = StandingOrders.targetIds
+
+  local sourceName = GetComponentData(ConvertStringToLuaID(tostring(sourceId)), "name")
+  local title = ReadText(1972092408, 10320)
+  local sourceTitle = string.format(ReadText(1972092408, 10321), sourceName)
+  local targetsTitle = ReadText(1972092408, 10322)
+
+  local width = options.width or Helper.scaleX(600)
+  local xoffset = options.xoffset or (Helper.viewWidth - width) / 2
+  local yoffset = options.yoffset or Helper.viewHeight / 2
+  local okLabel = options.okLabel or ReadText(1001, 14)
+
+  local columns = 0
+  + 1 -- order Id
+  + 2 -- ware
+  + 1 -- quantity
+  + 1 -- price
+  + 3 -- location
+  + 4 -- ship
+
+  local message = ""
+
+  local onClose = nil
+
+  menu.closeContextMenu()
+
+  menu.contextMenuMode = "standing_orders_clone_confirm"
+  menu.contextMenuData = {
+    mode = "standing_orders_clone_confirm",
+    width = width,
+    xoffset = xoffset,
+    yoffset = yoffset,
+  }
+
+  local contextLayer = menu.contextFrameLayer or 2
+
+  menu.contextFrame = Helper.createFrameHandle(menu, {
+    x = xoffset - 2 * Helper.borderSize,
+    y = yoffset,
+    width = width + 2 * Helper.borderSize,
+    layer = contextLayer,
+    standardButtons = { close = true },
+    closeOnUnhandledClick = true,
+  })
+  local frame = menu.contextFrame
+  frame:setBackground("solid", { color = Color["frame_background_semitransparent"] })
+
+  local ftable = frame:addTable(12, { tabOrder = 1, x = Helper.borderSize, y = Helper.borderSize, width = width, reserveScrollBar = false, highlightMode = "off" })
+
+  local headerRow = ftable:addRow(false, { fixed = true })
+  headerRow[1]:setColSpan(12):createText(title, Helper.titleTextProperties)
+  ftable:addEmptyRow(Helper.standardTextHeight / 2)
+  local headerRow = ftable:addRow(false, { fixed = true })
+  headerRow[1]:setColSpan(8):createText(sourceTitle, Helper.titleTextProperties)
+  headerRow[9]:setColSpan(4):createText(targetsTitle, Helper.titleTextProperties)
+  ftable:addEmptyRow(Helper.standardTextHeight / 2)
+
+
+  local headerRow = ftable:addRow(false, { fixed = true })
+  headerRow[1]:setColSpan(8):createText(ReadText(1001, 3225), Helper.headerRowCenteredProperties) -- Order Queue
+  headerRow[9]:setColSpan(4):createText(ReadText(1001, 2809), Helper.headerRowCenteredProperties) -- Name
+
+  local tableHeaderRow = ftable:addRow(false, { fixed = true })
+  tableHeaderRow[1]:createText(ReadText(1001, 7802), Helper.headerRowCenteredProperties) -- Orders
+  tableHeaderRow[2]:setColSpan(2):createText(ReadText(1001, 45), Helper.headerRowCenteredProperties) -- Ware
+  tableHeaderRow[4]:createText(ReadText(1001, 1202), Helper.headerRowCenteredProperties) -- Amount
+  tableHeaderRow[5]:createText(ReadText(1001, 2808), Helper.headerRowCenteredProperties) -- Price
+  tableHeaderRow[6]:setColSpan(3):createText(ReadText(1041, 10049), Helper.headerRowCenteredProperties) -- Location
+
+  ftable:addEmptyRow(Helper.standardTextHeight / 2)
+
+  local buttonRow = ftable:addRow(true, { fixed = true })
+  buttonRow[9]:setColSpan(2):createButton():setText(ReadText(1001, 2821), { halign = "center" })
+  buttonRow[9].handlers.onClick = function ()
+    local shouldClose = true
+    if type(onClose) == "function" then
+      shouldClose = onClose(menu, sourceId) ~= false
+    end
+    if shouldClose then
+      menu.closeContextMenu("back")
+    end
+  end
+  buttonRow[10].handlers.onClick = function ()
+    local shouldClose = true
+    if type(onClose) == "function" then
+      shouldClose = onClose(menu, sourceId) ~= false
+    end
+    if shouldClose then
+      menu.closeContextMenu("back")
+    end
+  end
+  buttonRow[11]:setColSpan(2):createButton():setText(ReadText(1001, 64), { halign = "center" })
+  buttonRow[11].handlers.onClick = function ()
+    local shouldClose = true
+    if type(onClose) == "function" then
+      shouldClose = onClose(menu, sourceId) ~= false
+    end
+    if shouldClose then
+      menu.closeContextMenu("back")
+    end
+  end
+  buttonRow[12].handlers.onClick = function ()
+    local shouldClose = true
+    if type(onClose) == "function" then
+      shouldClose = onClose(menu, sourceId) ~= false
+    end
+    if shouldClose then
+      menu.closeContextMenu("back")
+    end
+  end
+  -- ftable:setSelectedCol(3)
+
+  frame.properties.height = math.min(Helper.viewHeight - frame.properties.y, frame:getUsedHeight() + Helper.borderSize)
+
+  frame:display()
+
+  return true
+end
+
 function StandingOrders.ProcessRequest(_, _)
   if StandingOrders.mapMenu and StandingOrders.mapMenu.holomap and (StandingOrders.mapMenu.holomap ~= 0) then
     local args = StandingOrders.getArgs()
@@ -387,6 +595,13 @@ function StandingOrders.ProcessRequest(_, _)
       end
     elseif args.command == "unmark_source" then
       StandingOrders.MarkSourceOnMap(args)
+    elseif args.command == "clone_orders" then
+      local valid, errorData = StandingOrders.cloneOrdersPrepare(args)
+      if valid then
+        StandingOrders.cloneOrdersConfirm()
+      else
+        StandingOrders.reportError(args, errorData)
+      end
     else
       debugTrace("ProcessRequest received unknown command: " .. tostring(args.command))
       StandingOrders.reportError(args, { info = "UnknownCommand" })
