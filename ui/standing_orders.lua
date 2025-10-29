@@ -578,7 +578,7 @@ function StandingOrders.cloneOrdersConfirm()
         if (#locations > 1) then
           locName = locName .. ", ..."
         end
-        row[6]:setColSpan(3):createText(locName)
+        row[6]:setColSpan(3):createText(locName )
       else
         row[6]:setColSpan(3):createText("-", {halign = "center"})
       end
@@ -616,8 +616,6 @@ function StandingOrders.cloneOrdersConfirm()
   centerFrameVertically(frame)
 
   frame:display()
-
-  return true
 end
 
 function StandingOrders.cloneOrdersExecute()
