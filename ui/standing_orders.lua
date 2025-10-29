@@ -373,8 +373,10 @@ function StandingOrders.alertMessage(options)
 
   local ftable = frame:addTable(5, { tabOrder = 1, x = Helper.borderSize, y = Helper.borderSize, width = width, reserveScrollBar = false, highlightMode = "off" })
 
+  local warningProperties = Helper.titleTextProperties
+  warningProperties.color = Color["text_warning"]
   local headerRow = ftable:addRow(false, { fixed = true })
-  headerRow[1]:setColSpan(5):createText(title, Helper.titleTextProperties)
+  headerRow[1]:setColSpan(5):createText(title, warningProperties)
 
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
@@ -464,10 +466,9 @@ function StandingOrders.cloneOrdersConfirm()
   local sourceTitle = string.format(ReadText(1972092408, 10321), sourceName)
   local targetsTitle = ReadText(1972092408, 10322)
 
-  local width = options.width or Helper.scaleX(600)
-  local xoffset = options.xoffset or (Helper.viewWidth - width) / 2
-  local yoffset = options.yoffset or Helper.viewHeight / 2
-  local okLabel = options.okLabel or ReadText(1001, 14)
+  local width = Helper.scaleX(800)
+  local xoffset = (Helper.viewWidth - width) / 2
+  local yoffset = Helper.viewHeight / 2
 
   local columns = 0
   + 1 -- order Id
@@ -507,17 +508,22 @@ function StandingOrders.cloneOrdersConfirm()
   local ftable = frame:addTable(12, { tabOrder = 1, x = Helper.borderSize, y = Helper.borderSize, width = width, reserveScrollBar = false, highlightMode = "off" })
 
   local headerRow = ftable:addRow(false, { fixed = true })
-  headerRow[1]:setColSpan(12):createText(title, Helper.titleTextProperties)
+  local titleProperties = Helper.titleTextProperties
+  titleProperties.color = Color["text_positive"]
+  headerRow[1]:setColSpan(12):createText(title, titleProperties)
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
   local headerRow = ftable:addRow(false, { fixed = true })
-  headerRow[1]:setColSpan(8):createText(sourceTitle, Helper.titleTextProperties)
-  headerRow[9]:setColSpan(4):createText(targetsTitle, Helper.titleTextProperties)
+  local sourceTitleProperties = Helper.titleTextProperties
+  sourceTitleProperties.color = Color["text_player"]
+  headerRow[1]:setColSpan(8):createText(sourceTitle, sourceTitleProperties)
+  local targetsTitleProperties = Helper.titleTextProperties
+  targetsTitleProperties.color = Color["text_player_current"]
+  headerRow[9]:setColSpan(4):createText(targetsTitle, targetsTitleProperties)
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
 
   local headerRow = ftable:addRow(false, { fixed = true })
   headerRow[1]:setColSpan(8):createText(ReadText(1001, 3225), Helper.headerRowCenteredProperties) -- Order Queue
-  headerRow[9]:setColSpan(4):createText(ReadText(1001, 2809), Helper.headerRowCenteredProperties) -- Name
 
   local tableHeaderRow = ftable:addRow(false, { fixed = true })
   tableHeaderRow[1]:createText(ReadText(1001, 7802), Helper.headerRowCenteredProperties) -- Orders
@@ -525,8 +531,44 @@ function StandingOrders.cloneOrdersConfirm()
   tableHeaderRow[4]:createText(ReadText(1001, 1202), Helper.headerRowCenteredProperties) -- Amount
   tableHeaderRow[5]:createText(ReadText(1001, 2808), Helper.headerRowCenteredProperties) -- Price
   tableHeaderRow[6]:setColSpan(3):createText(ReadText(1041, 10049), Helper.headerRowCenteredProperties) -- Location
+  tableHeaderRow[9]:setColSpan(4):createText(ReadText(1001, 2809), Helper.headerRowCenteredProperties) -- Name
 
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
+
+  local orders = StandingOrders.getStandingOrders(sourceId)
+
+  local lineCount = math.max(#orders, #targetIds)
+  for i = 1, lineCount do
+    local row = ftable:addRow(false)
+    if i <= #orders then
+      local order = orders[i]
+      local orderparams = GetOrderParams(sourceId, order.idx)
+      row[1]:createText(tostring(order.idx), Helper.standardTextProperties)
+      row[2]:setColSpan(2):createText(GetWareData(orderparams[1].value, "name"), Helper.standardTextProperties)
+      row[4]:createText(math.floor(orderparams[5].value), Helper.standardTextProperties)
+      row[5]:createText(math.floor(orderparams[7].value), Helper.standardTextProperties)
+      local locations = orderparams[4].value
+      if type(locations) == "table" and #locations >= 1 then
+        local locId = toUniverseId(locations[1])
+        local locName = GetComponentData(ConvertStringToLuaID(tostring(locId)), "name")
+        if (#locations > 1) then
+          locName = locName .. ", ..."
+        end
+        row[6]:setColSpan(3):createText(locName, Helper.standardTextProperties)
+      else
+        row[6]:setColSpan(3):createText("-", Helper.standardTextProperties)
+      end
+    else
+      row[1]:setColSpan(8):createText("", Helper.standardTextProperties)
+    end
+    if i <= #targetIds then
+      local targetName = GetComponentData(ConvertStringToLuaID(tostring(targetIds[i])), "name")
+      row[9]:setColSpan(4):createText(tostring(targetName), Helper.standardTextProperties)
+    else
+      row[9]:setColSpan(4):createText("", Helper.standardTextProperties)
+    end
+  end
+
 
   local buttonRow = ftable:addRow(true, { fixed = true })
   buttonRow[9]:setColSpan(2):createButton():setText(ReadText(1001, 2821), { halign = "center" })
