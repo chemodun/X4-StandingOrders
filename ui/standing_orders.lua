@@ -413,11 +413,8 @@ function StandingOrders.alertMessage(options)
   local messageRow = ftable:addRow(false, { fixed = true })
   messageRow[1]:setColSpan(5):createText(message, {
     halign = "center",
-    valign = "top",
     wordwrap = true,
-    color = Color["text_normal"],
-    fontname = Helper.standardFont,
-    fontsize = Helper.standardFontSize,
+    color = Color["text_normal"]
   })
 
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
