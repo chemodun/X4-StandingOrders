@@ -46,6 +46,8 @@ ffi.cdef [[
 	size_t GetOrderQueueFirstLoopIdx(UniverseID controllableid, bool* isvalid);
   uint32_t GetOrders(Order* result, uint32_t resultlen, UniverseID controllableid);
 	uint32_t CreateOrder(UniverseID controllableid, const char* orderid, bool default);
+	bool EnablePlannedDefaultOrder(UniverseID controllableid, bool checkonly);
+	bool SetOrderLoop(UniverseID controllableid, size_t orderidx, bool checkonly);
 	bool EnableOrder(UniverseID controllableid, size_t idx);
 ]]
 
@@ -559,13 +561,13 @@ function StandingOrders.cloneOrdersConfirm()
       local orderparams = GetOrderParams(sourceId, order.idx)
       row[1]:createText(StandingOrders.validOrders[order.order], {halign = "left"})
       row[2]:setColSpan(2):createText(GetWareData(orderparams[1].value, "name"), {halign = "left"})
-      local amount = math.floor(orderparams[5].value)
+      local amount = orderparams[5].value
       if order.order == "SingleSell" then
         amount = cargoCapacity - amount
       end
       local percentage = (cargoCapacity > 0) and (amount * 100 / cargoCapacity ) or 0
       row[4]:createText(string.format("%.2f%%", percentage), {halign = "right"})
-      row[5]:createText(math.floor(orderparams[7].value), {halign = "right"})
+      row[5]:createText(orderparams[7].value, {halign = "right"})
       local locations = orderparams[4].value
       if type(locations) == "table" and #locations >= 1 then
         local locId = toUniverseId(locations[1])
@@ -619,8 +621,54 @@ function StandingOrders.cloneOrdersConfirm()
 end
 
 function StandingOrders.cloneOrdersExecute()
-  debugTrace("Executing clone orders from source " .. tostring(StandingOrders.sourceId) .. " to " .. tostring(#StandingOrders.targetIds) .. " targets")
+  debugTrace("Executing clone orders from source " .. getShipName(StandingOrders.sourceId) .. " to " .. tostring(#StandingOrders.targetIds) .. " targets")
+  local sourceOrders = StandingOrders.getStandingOrders(StandingOrders.sourceId)
+  local targets = StandingOrders.targetIds
+  local cargoCapacity = StandingOrders.getCargoCapacity(StandingOrders.sourceId)
+  local processedOrders = 0
+  for i = 1, #targets do
+    local targetId = targets[i]
+    debugTrace("Cloning orders to target " .. getShipName(targetId))
+    if not C.RemoveAllOrders(targetId) then
+      debugTrace("failed to clear target order queue for " .. getShipName(targetId))
+    else
+      C.CreateOrder(targetId, "Wait", true)
+      C.EnablePlannedDefaultOrder(targetId, false)
+      C.SetOrderLoop(targetId, 0, false)
+      local targetCargoCapacity = StandingOrders.getCargoCapacity(targetId)
+      for j = 1, #sourceOrders do
+        local order = sourceOrders[j]
+        if order.ware == nil then
+          local orderParams = GetOrderParams(StandingOrders.sourceId, order.idx)
+          order.ware = orderParams[1].value
+          order.amount = (cargoCapacity > 0) and (orderParams[5].value / cargoCapacity ) or 0
+          order.price = orderParams[7].value * 100
+          order.locations = orderParams[4].value
+        end
+        local newOrderIdx = C.CreateOrder(targetId, order.order, false)
+        if newOrderIdx and newOrderIdx > 0 then
+          SetOrderParam(targetId, newOrderIdx, 1, nil, order.ware)
+          SetOrderParam(targetId, newOrderIdx, 5, nil, math.floor(order.amount * targetCargoCapacity + 0.5))
+          SetOrderParam(targetId, newOrderIdx, 7, nil, order.price)
+          local locations = order.locations or {}
+          for j=1, #locations do
+            SetOrderParam(targetId, newOrderIdx, 4, nil, locations[j])
+          end
+          debugTrace(" Created order " .. tostring(order.order) .. " on target " .. getShipName(targetId) .. " at index " .. tostring(newOrderIdx))
+          C.EnableOrder(targetId, newOrderIdx)
+          processedOrders = processedOrders + 1
+        else
+          debugTrace(" Failed to create order " .. tostring(order.order) .. " on target " .. getShipName(targetId))
+        end
+      end
+    end
+  end
   StandingOrders.cloneOrdersReset()
+  if processedOrders == 0 then
+    StandingOrders.reportError({ info = "NoOrdersCloned" })
+  else
+    StandingOrders.reportSuccess({ info = "OrdersCloned", details = string.format("%d orders cloned to %d targets", processedOrders, #targets) })
+  end
 end
 
 function StandingOrders.cloneOrdersCancel()
