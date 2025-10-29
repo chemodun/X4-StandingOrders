@@ -598,20 +598,17 @@ function StandingOrders.cloneOrdersConfirm()
     StandingOrders.cloneOrdersExecute()
     menu.closeContextMenu("back")
   end
-  buttonRow[10].handlers.onClick = function ()
-    StandingOrders.cloneOrdersExecute()
-    menu.closeContextMenu("back")
-  end
   buttonRow[11]:setColSpan(2):createButton():setText(ReadText(1001, 64), { halign = "center" })
   buttonRow[11].handlers.onClick = function ()
     StandingOrders.cloneOrdersCancel()
     menu.closeContextMenu("back")
   end
-  buttonRow[12].handlers.onClick = function ()
-    StandingOrders.cloneOrdersCancel()
+  buttonRow[1]:setColSpan(2):createButton():setText(ReadText(1972092408, 10201), { halign = "center" })
+  buttonRow[1].handlers.onClick = function ()
+    StandingOrders.clearSource()
     menu.closeContextMenu("back")
   end
-  -- ftable:setSelectedCol(3)
+  ftable:setSelectedCol(11)
 
   frame.properties.height = math.min(Helper.viewHeight - frame.properties.y, frame:getUsedHeight() + Helper.borderSize)
 
@@ -674,6 +671,12 @@ end
 function StandingOrders.cloneOrdersCancel()
   StandingOrders.cloneOrdersReset()
   StandingOrders.reportSuccess({result = "cancelled"})
+end
+
+function StandingOrders.clearSource()
+  StandingOrders.cloneOrdersReset()
+  StandingOrders.args.command = "unmark_source"
+  StandingOrders.MarkSourceOnMap()
 end
 
 function StandingOrders.cloneOrdersReset()
