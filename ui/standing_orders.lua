@@ -23,7 +23,20 @@ ffi.cdef [[
    uint32_t capacity;
   } StorageInfo;
 
+	typedef struct {
+		const char* id;
+		const char* name;
+		const char* icon;
+		const char* description;
+		const char* category;
+		const char* categoryname;
+		bool infinite;
+		uint32_t requiredSkill;
+	} OrderDefinition;
+
 	UniverseID GetPlayerID(void);
+
+	bool GetOrderDefinition(OrderDefinition* result, const char* orderdef);
 	bool IsComponentClass(UniverseID componentid, const char* classname);
 	bool IsComponentOperational(UniverseID componentid);
 	bool IsComponentWrecked(UniverseID componentid);
@@ -36,11 +49,12 @@ ffi.cdef [[
 ]]
 
 local StandingOrders = {
+  args = {},
   playerId = 0,
   mapMenu = {},
   validOrders = {
-    SingleBuy  = true,
-    SingleSell = true,
+    SingleBuy  = "",
+    SingleSell = "",
   },
   sourceId = 0,
   targetIds = {},
@@ -86,17 +100,19 @@ local function toUniverseId(value)
   return ConvertStringTo64Bit(idStr)
 end
 
-local function readTextOrFallback(page, id, fallback)
-  if type(ReadText) == "function" then
-    local ok, value = pcall(ReadText, page, id)
-    if ok and type(value) == "string" and value ~= "" then
-      return value
-    end
+local function copyAndEnrichTable(src, extraInfo)
+  local dest = {}
+  for k, v in pairs(src) do
+    dest[k] = v
   end
-  return fallback
+  for k, v in pairs(extraInfo) do
+    dest[k] = v
+  end
+  return dest
 end
 
-function StandingOrders.recordResult(data)
+function StandingOrders.recordResult()
+  local data = StandingOrders.args or {}
   debugTrace("recordResult called for command ".. tostring(data and data.command) .. " with result " .. tostring(data and data.result))
   if StandingOrders.playerId ~= 0 then
     local payload = data or {}
@@ -105,8 +121,8 @@ function StandingOrders.recordResult(data)
   end
 end
 
-function StandingOrders.reportError(data, extraInfo)
-  local data = data or {}
+function StandingOrders.reportError(extraInfo)
+  local data = StandingOrders.args or {}
   data.result = "error"
   if extraInfo == nil then
     extraInfo = {}
@@ -114,7 +130,7 @@ function StandingOrders.reportError(data, extraInfo)
   for k, v in pairs(extraInfo) do
     data[k] = v
   end
-  StandingOrders.recordResult(data)
+  StandingOrders.recordResult()
 
   local message = "StandingOrders error"
   if data.info then
@@ -127,10 +143,10 @@ function StandingOrders.reportError(data, extraInfo)
   DebugError(message)
 end
 
-function StandingOrders.reportSuccess(data)
-  data = data or {}
-  data.result = "success"
-  StandingOrders.recordResult(data)
+function StandingOrders.reportSuccess(extraStatus)
+  data = StandingOrders.args or {}
+  data.result = extraStatus or "success"
+  StandingOrders.recordResult()
 end
 
 function StandingOrders.isLoopEnabled(shipId)
@@ -198,8 +214,8 @@ function StandingOrders.getCargoCapacity(shipId)
 end
 
 
-function StandingOrders.isValidSourceShip(source)
-  local sourceId = toUniverseId(source)
+function StandingOrders.isValidSourceShip()
+  local sourceId = toUniverseId(StandingOrders.args.source)
   local valid, errorData = StandingOrders.checkShip(sourceId)
   if not valid then
     return false, errorData
@@ -212,7 +228,7 @@ function StandingOrders.isValidSourceShip(source)
     return false, { info = "NoStandingOrders" }
   end
   for _, order in ipairs(orders) do
-    if not StandingOrders.validOrders[order.order] then
+    if StandingOrders.validOrders[order.order] == nil then
       return false, { info = "InvalidStandingOrder", detail = "order=" .. tostring(order.order) }
     end
   end
@@ -236,27 +252,29 @@ end
 
 
 function StandingOrders.getArgs()
+  StandingOrders.args = {}
   if StandingOrders.playerId == 0 then
     debugTrace("getArgs unable to resolve player id")
   else
     local list = GetNPCBlackboard(StandingOrders.playerId, "$StandingOrdersRequest")
     if type(list) == "table" then
       debugTrace("getArgs retrieved " .. tostring(#list) .. " entries from blackboard")
-      local args = list[#list]
+      StandingOrders.args = list[#list]
       SetNPCBlackboard(StandingOrders.playerId, "$StandingOrdersRequest", nil)
-      return args
+      return true
     elseif list ~= nil then
       debugTrace("getArgs received non-table payload of type " .. type(list))
     else
       debugTrace("getArgs found no blackboard entries for player " .. tostring(StandingOrders.playerId))
     end
   end
-  return nil
+  return false
 end
 
 
-function StandingOrders.MarkSourceOnMap(args)
-  local source = tostring(args.source)
+function StandingOrders.MarkSourceOnMap()
+  local source = tostring(StandingOrders.args.source)
+  local args = StandingOrders.args or {}
   if not source or source == "" then
     StandingOrders.reportError({ info = "InvalidSourceID" })
     return
@@ -274,18 +292,18 @@ function StandingOrders.MarkSourceOnMap(args)
     StandingOrders.mapMenu.refreshInfoFrame()
   else
     args.info = "NoMap"
-    StandingOrders.reportError(args)
+    StandingOrders.reportError()
     return
   end
-  StandingOrders.reportSuccess(args)
+  StandingOrders.reportSuccess()
 end
 
 
-function StandingOrders.showSourceAlert(source, errorData)
+function StandingOrders.showSourceAlert(errorData)
 
-  local sourceId = toUniverseId(source)
+  local sourceId = toUniverseId(StandingOrders.args.source)
 
-  local sourceName = GetComponentData(ConvertStringToLuaID(tostring(source)), "name")
+  local sourceName = GetComponentData(ConvertStringToLuaID(tostring(sourceId)), "name")
   local options = {}
   options.title = ReadText(1972092408, 10110)
   local details = "error"
@@ -420,12 +438,13 @@ function StandingOrders.showTargetAlert()
 end
 
 
-function StandingOrders.cloneOrdersPrepare(args)
-  local valid, errorData = StandingOrders.isValidSourceShip(args.source)
+function StandingOrders.cloneOrdersPrepare()
+  local valid, errorData = StandingOrders.isValidSourceShip()
   if not valid then
-    StandingOrders.showSourceAlert(args.source, errorData)
+    StandingOrders.showSourceAlert(errorData)
     return false, errorData
   end
+  local args = StandingOrders.args or {}
   StandingOrders.sourceId = toUniverseId(args.source)
   local targets = args.targets or {}
   local targetIds = {}
@@ -470,18 +489,6 @@ function StandingOrders.cloneOrdersConfirm()
   local xoffset = (Helper.viewWidth - width) / 2
   local yoffset = Helper.viewHeight / 2
 
-  local columns = 0
-  + 1 -- order Id
-  + 2 -- ware
-  + 1 -- quantity
-  + 1 -- price
-  + 3 -- location
-  + 4 -- ship
-
-  local message = ""
-
-  local onClose = nil
-
   menu.closeContextMenu()
 
   menu.contextMenuMode = "standing_orders_clone_confirm"
@@ -508,16 +515,13 @@ function StandingOrders.cloneOrdersConfirm()
   local ftable = frame:addTable(12, { tabOrder = 1, x = Helper.borderSize, y = Helper.borderSize, width = width, reserveScrollBar = false, highlightMode = "off" })
 
   local headerRow = ftable:addRow(false, { fixed = true })
-  local titleProperties = Helper.titleTextProperties
-  titleProperties.color = Color["text_positive"]
+  local titleProperties = copyAndEnrichTable(Helper.titleTextProperties, {color = Color["text_positive"]})
   headerRow[1]:setColSpan(12):createText(title, titleProperties)
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
   local headerRow = ftable:addRow(false, { fixed = true })
-  local sourceTitleProperties = Helper.titleTextProperties
-  sourceTitleProperties.color = Color["text_player"]
+  local sourceTitleProperties = copyAndEnrichTable(Helper.headerRowCenteredProperties, {color = Color["text_player"]})
   headerRow[1]:setColSpan(8):createText(sourceTitle, sourceTitleProperties)
-  local targetsTitleProperties = Helper.titleTextProperties
-  targetsTitleProperties.color = Color["text_player_current"]
+  local targetsTitleProperties = copyAndEnrichTable(Helper.headerRowCenteredProperties, {color = Color["text_player_current"]})
   headerRow[9]:setColSpan(4):createText(targetsTitle, targetsTitleProperties)
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
@@ -543,10 +547,10 @@ function StandingOrders.cloneOrdersConfirm()
     if i <= #orders then
       local order = orders[i]
       local orderparams = GetOrderParams(sourceId, order.idx)
-      row[1]:createText(tostring(order.idx), Helper.standardTextProperties)
-      row[2]:setColSpan(2):createText(GetWareData(orderparams[1].value, "name"), Helper.standardTextProperties)
-      row[4]:createText(math.floor(orderparams[5].value), Helper.standardTextProperties)
-      row[5]:createText(math.floor(orderparams[7].value), Helper.standardTextProperties)
+      row[1]:createText(StandingOrders.validOrders[order.order], {halign = "left"})
+      row[2]:setColSpan(2):createText(GetWareData(orderparams[1].value, "name"), {halign = "left"})
+      row[4]:createText(math.floor(orderparams[5].value), {halign = "right"})
+      row[5]:createText(math.floor(orderparams[7].value), {halign = "right"})
       local locations = orderparams[4].value
       if type(locations) == "table" and #locations >= 1 then
         local locId = toUniverseId(locations[1])
@@ -554,18 +558,18 @@ function StandingOrders.cloneOrdersConfirm()
         if (#locations > 1) then
           locName = locName .. ", ..."
         end
-        row[6]:setColSpan(3):createText(locName, Helper.standardTextProperties)
+        row[6]:setColSpan(3):createText(locName, {halign = "center"})
       else
-        row[6]:setColSpan(3):createText("-", Helper.standardTextProperties)
+        row[6]:setColSpan(3):createText("-", {halign = "center"})
       end
     else
-      row[1]:setColSpan(8):createText("", Helper.standardTextProperties)
+      row[1]:setColSpan(8):createText("", {halign = "left"})
     end
     if i <= #targetIds then
       local targetName = GetComponentData(ConvertStringToLuaID(tostring(targetIds[i])), "name")
-      row[9]:setColSpan(4):createText(tostring(targetName), Helper.standardTextProperties)
+      row[9]:setColSpan(4):createText(tostring(targetName), {halign = "left"})
     else
-      row[9]:setColSpan(4):createText("", Helper.standardTextProperties)
+      row[9]:setColSpan(4):createText("", {halign = "center"})
     end
   end
 
@@ -573,41 +577,21 @@ function StandingOrders.cloneOrdersConfirm()
   local buttonRow = ftable:addRow(true, { fixed = true })
   buttonRow[9]:setColSpan(2):createButton():setText(ReadText(1001, 2821), { halign = "center" })
   buttonRow[9].handlers.onClick = function ()
-    local shouldClose = true
-    if type(onClose) == "function" then
-      shouldClose = onClose(menu, sourceId) ~= false
-    end
-    if shouldClose then
-      menu.closeContextMenu("back")
-    end
+    StandingOrders.cloneOrdersExecute()
+    menu.closeContextMenu("back")
   end
   buttonRow[10].handlers.onClick = function ()
-    local shouldClose = true
-    if type(onClose) == "function" then
-      shouldClose = onClose(menu, sourceId) ~= false
-    end
-    if shouldClose then
-      menu.closeContextMenu("back")
-    end
+    StandingOrders.cloneOrdersExecute()
+    menu.closeContextMenu("back")
   end
   buttonRow[11]:setColSpan(2):createButton():setText(ReadText(1001, 64), { halign = "center" })
   buttonRow[11].handlers.onClick = function ()
-    local shouldClose = true
-    if type(onClose) == "function" then
-      shouldClose = onClose(menu, sourceId) ~= false
-    end
-    if shouldClose then
-      menu.closeContextMenu("back")
-    end
+    StandingOrders.cloneOrdersCancel()
+    menu.closeContextMenu("back")
   end
   buttonRow[12].handlers.onClick = function ()
-    local shouldClose = true
-    if type(onClose) == "function" then
-      shouldClose = onClose(menu, sourceId) ~= false
-    end
-    if shouldClose then
-      menu.closeContextMenu("back")
-    end
+    StandingOrders.cloneOrdersCancel()
+    menu.closeContextMenu("back")
   end
   -- ftable:setSelectedCol(3)
 
@@ -618,39 +602,67 @@ function StandingOrders.cloneOrdersConfirm()
   return true
 end
 
+function StandingOrders.cloneOrdersExecute()
+  debugTrace("Executing clone orders from source " .. tostring(StandingOrders.sourceId) .. " to " .. tostring(#StandingOrders.targetIds) .. " targets")
+  StandingOrders.cloneOrdersReset()
+end
+
+function StandingOrders.cloneOrdersCancel()
+  StandingOrders.cloneOrdersReset()
+  StandingOrders.reportSuccess({result = "cancelled"})
+end
+
+function StandingOrders.cloneOrdersReset()
+  StandingOrders.sourceId = 0
+  StandingOrders.targetIds = {}
+end
+
 function StandingOrders.ProcessRequest(_, _)
   if StandingOrders.mapMenu and StandingOrders.mapMenu.holomap and (StandingOrders.mapMenu.holomap ~= 0) then
-    local args = StandingOrders.getArgs()
-    if not args or type(args) ~= "table" then
+    if not StandingOrders.getArgs() then
       debugTrace("ProcessRequest invoked without args or invalid args")
-      StandingOrders.reportError("missing_args")
+      StandingOrders.reportError({info ="missing_args"})
       return
     end
-    debugTrace("ProcessRequest received command: " .. tostring(args.command))
-    if args.command == "mark_source" then
-      local valid, errorData = StandingOrders.isValidSourceShip(args.source)
+    debugTrace("ProcessRequest received command: " .. tostring(StandingOrders.args.command))
+    if StandingOrders.args.command == "mark_source" then
+      local valid, errorData = StandingOrders.isValidSourceShip(StandingOrders.args.source)
       if valid then
-        StandingOrders.MarkSourceOnMap(args)
+        StandingOrders.MarkSourceOnMap()
       else
-        StandingOrders.showSourceAlert(args.source, errorData)
-        StandingOrders.reportError(args, errorData)
+        StandingOrders.showSourceAlert(errorData)
+        StandingOrders.reportError(errorData)
       end
     elseif args.command == "unmark_source" then
-      StandingOrders.MarkSourceOnMap(args)
+      StandingOrders.MarkSourceOnMap()
     elseif args.command == "clone_orders" then
       local valid, errorData = StandingOrders.cloneOrdersPrepare(args)
       if valid then
         StandingOrders.cloneOrdersConfirm()
       else
-        StandingOrders.reportError(args, errorData)
+        StandingOrders.reportError(errorData)
       end
     else
       debugTrace("ProcessRequest received unknown command: " .. tostring(args.command))
-      StandingOrders.reportError(args, { info = "UnknownCommand" })
+      StandingOrders.reportError({ info = "UnknownCommand" })
     end
   else
     debugTrace("ProcessRequest invoked but no MapMenu or Holomap available")
-    StandingOrders.reportError(args, { info = "NoMap" })
+    StandingOrders.reportError({ info = "NoMap" })
+  end
+end
+
+function StandingOrders.OrderNamesCollect()
+  for orderDef, _ in pairs(StandingOrders.validOrders) do
+    local buf = ffi.new("OrderDefinition")
+    local found = C.GetOrderDefinition(buf, orderDef)
+    if found then
+      local orderName = ffi.string(buf.name)
+      StandingOrders.validOrders[orderDef] = orderName
+      debugTrace("Order definition " .. orderDef .. " resolved to name " .. StandingOrders.validOrders[orderDef])
+    else
+      debugTrace("Order definition " .. orderDef .. " could not be resolved")
+    end
   end
 end
 
@@ -661,6 +673,7 @@ function StandingOrders.Init()
   AddUITriggeredEvent("StandingOrders", "Reloaded")
   StandingOrders.mapMenu = Lib.Get_Egosoft_Menu("MapMenu")
   debugTrace("MapMenu is " .. tostring(StandingOrders.mapMenu))
+  StandingOrders.OrderNamesCollect()
 end
 
 Register_Require_With_Init("extensions.standing_orders.ui.standing_orders", StandingOrders, StandingOrders.Init)
