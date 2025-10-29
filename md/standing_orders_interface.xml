@@ -67,7 +67,7 @@
                   $section    = 'interaction',
                   $text       = ' %s'.[{1972092408, 10101}],
                   $mouseover  = {1972092408, 10101},
-                  $icon       = 'mapst_fs_trade',
+                  $icon       = 'menu_export',
                   $active     = true,
                   $callback   =  Process_Menu
                 ]" />
@@ -97,7 +97,7 @@
                   $section    = 'interaction',
                   $text       = {1972092408, 10301}.[@$sourceShipForCloning.name],
                   $mouseover  = {1972092408, 10301}.[@$sourceShipForCloning.name],
-                  $icon       = 'menu_export',
+                  $icon       = 'menu_import',
                   $active     = true,
                   $callback   =  Process_Menu
                 ]" />
