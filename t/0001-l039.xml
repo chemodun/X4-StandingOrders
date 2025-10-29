@@ -20,7 +20,7 @@
       <t id="10310">Nessun bersaglio valido selezionato</t>
       <t id="10311">Impossibile clonare gli ordini perché non sono stati selezionati bersagli validi!</t>
       <t id="10320">Conferma clonazione ordini</t>
-      <t id="10321">Origine: %s</t>
+      <t id="10321">Origine:</t>
       <t id="10322">Navi bersaglio:</t>
     </page>
   </add>

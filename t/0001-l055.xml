@@ -20,7 +20,7 @@
       <t id="10310">Nenhum alvo válido selecionado</t>
       <t id="10311">Não é possível clonar as ordens, pois nenhum alvo válido foi selecionado!</t>
       <t id="10320">Confirmar clonagem de ordens</t>
-      <t id="10321">Origem: %s</t>
+      <t id="10321">Origem:</t>
       <t id="10322">Naves alvo:</t>
     </page>
   </add>

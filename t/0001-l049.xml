@@ -20,7 +20,7 @@
       <t id="10310">Keine gültigen Ziele ausgewählt</t>
       <t id="10311">Befehle können nicht geklont werden, da keine gültigen Ziele ausgewählt wurden!</t>
       <t id="10320">Klonen der Befehle bestätigen</t>
-      <t id="10321">Quelle: %s</t>
+      <t id="10321">Quelle:</t>
       <t id="10322">Zielschiffe:</t>
     </page>
   </add>

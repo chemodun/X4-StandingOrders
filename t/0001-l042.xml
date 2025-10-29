@@ -20,7 +20,7 @@
       <t id="10310">Nejsou vybrány žádné platné cíle</t>
       <t id="10311">Příkazy nelze klonovat, protože nejsou vybrány žádné platné cíle!</t>
       <t id="10320">Potvrdit klonování příkazů</t>
-      <t id="10321">Zdroj: %s</t>
+      <t id="10321">Zdroj:</t>
       <t id="10322">Cílové lodě:</t>
     </page>
   </add>

@@ -20,8 +20,8 @@
       <t id="10310">Aucune cible valide sélectionnée</t>
       <t id="10311">Impossible de cloner les ordres car aucune cible valide n'est sélectionnée !</t>
       <t id="10320">Confirmer le clonage des ordres</t>
-      <t id="10321">Source : %s</t>
-      <t id="10322">Vaisseaux cibles :</t>
+      <t id="10321">Source:</t>
+      <t id="10322">Vaisseaux cibles:</t>
     </page>
   </add>
 </diff>

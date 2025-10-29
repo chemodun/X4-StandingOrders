@@ -20,7 +20,7 @@
       <t id="10310">No hay objetivos válidos seleccionados</t>
       <t id="10311">¡Las órdenes no pueden clonarse porque no se seleccionaron objetivos válidos!</t>
       <t id="10320">Confirmar clonación de órdenes</t>
-      <t id="10321">Origen: %s</t>
+      <t id="10321">Origen:</t>
       <t id="10322">Naves objetivo:</t>
     </page>
   </add>

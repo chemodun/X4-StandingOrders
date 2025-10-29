@@ -19,7 +19,7 @@
       <t id="10310">No valid targets selected</t>
       <t id="10311">Orders can't be cloned as no valid targets are selected!</t>
       <t id="10320">Confirm cloning orders</t>
-      <t id="10321">Source: %s</t>
+      <t id="10321">Source:</t>
       <t id="10322">Target ships:</t>
     </page>
   </add>

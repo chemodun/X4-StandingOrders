@@ -20,7 +20,7 @@
       <t id="10310">Geçerli hedef seçilmedi</t>
       <t id="10311">Geçerli hedefler seçilmediği için emirler kopyalanamıyor!</t>
       <t id="10320">Emir kopyalamayı onayla</t>
-      <t id="10321">Kaynak: %s</t>
+      <t id="10321">Kaynak:</t>
       <t id="10322">Hedef gemiler:</t>
     </page>
   </add>
