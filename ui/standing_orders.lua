@@ -123,6 +123,16 @@ local function getShipName(shipId)
   return string.format("%s (%s)", name, idCode)
 end
 
+local function centerFrameVertically(frame)
+  frame.properties.height = frame:getUsedHeight() + Helper.borderSize
+  if (frame.properties.height > Helper.viewHeight ) then
+    frame.properties.y = Helper.borderSize
+    frame.properties.height = Helper.viewHeight - 2 * Helper.borderSize
+  else
+    frame.properties.y = (Helper.viewHeight - frame.properties.height) / 2
+  end
+end
+
 function StandingOrders.recordResult()
   local data = StandingOrders.args or {}
   debugTrace("recordResult called for command ".. tostring(data and data.command) .. " with result " .. tostring(data and data.result))
@@ -403,10 +413,8 @@ function StandingOrders.alertMessage(options)
 
   local ftable = frame:addTable(5, { tabOrder = 1, x = Helper.borderSize, y = Helper.borderSize, width = width, reserveScrollBar = false, highlightMode = "off" })
 
-  local warningProperties = Helper.titleTextProperties
-  warningProperties.color = Color["text_warning"]
   local headerRow = ftable:addRow(false, { fixed = true })
-  headerRow[1]:setColSpan(5):createText(title, warningProperties)
+  headerRow[1]:setColSpan(5):createText(title, copyAndEnrichTable(Helper.headerRowCenteredProperties, { color = Color["text_warning"] }))
 
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
@@ -432,7 +440,7 @@ function StandingOrders.alertMessage(options)
   end
   ftable:setSelectedCol(3)
 
-  frame.properties.height = math.min(Helper.viewHeight - frame.properties.y, frame:getUsedHeight() + Helper.borderSize)
+  centerFrameVertically(frame)
 
   frame:display()
 
@@ -491,10 +499,9 @@ function StandingOrders.cloneOrdersConfirm()
 
   local sourceName = getShipName(sourceId)
   local title = ReadText(1972092408, 10320)
-  local sourceTitle = string.format(ReadText(1972092408, 10321), sourceName)
   local targetsTitle = ReadText(1972092408, 10322)
 
-  local width = Helper.scaleX(800)
+  local width = Helper.scaleX(910)
   local xoffset = (Helper.viewWidth - width) / 2
   local yoffset = Helper.viewHeight / 2
 
@@ -521,17 +528,16 @@ function StandingOrders.cloneOrdersConfirm()
   local frame = menu.contextFrame
   frame:setBackground("solid", { color = Color["frame_background_semitransparent"] })
 
-  local ftable = frame:addTable(12, { tabOrder = 1, x = Helper.borderSize, y = Helper.borderSize, width = width, reserveScrollBar = false, highlightMode = "off" })
+  local ftable = frame:addTable(13, { tabOrder = 1, x = Helper.borderSize, y = Helper.borderSize, width = width, reserveScrollBar = false, highlightMode = "off" })
 
   local headerRow = ftable:addRow(false, { fixed = true })
-  local titleProperties = copyAndEnrichTable(Helper.titleTextProperties, {color = Color["text_positive"]})
-  headerRow[1]:setColSpan(12):createText(title, titleProperties)
+  headerRow[1]:setColSpan(13):createText(title, Helper.titleTextProperties)
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
   local headerRow = ftable:addRow(false, { fixed = true })
-  local sourceTitleProperties = copyAndEnrichTable(Helper.headerRowCenteredProperties, {color = Color["text_player"]})
-  headerRow[1]:setColSpan(8):createText(sourceTitle, sourceTitleProperties)
-  local targetsTitleProperties = copyAndEnrichTable(Helper.headerRowCenteredProperties, {color = Color["text_player_current"]})
-  headerRow[9]:setColSpan(4):createText(targetsTitle, targetsTitleProperties)
+  headerRow[1]:createText(ReadText(1972092408, 10321), Helper.headerRow1Properties)
+  local sourceNameProperties = copyAndEnrichTable(Helper.headerRowCenteredProperties, {color = Color["text_player_current"]})
+  headerRow[2]:setColSpan(7):createText(sourceName, sourceNameProperties)
+  headerRow[9]:setColSpan(5):createText(targetsTitle, Helper.headerRowCenteredProperties)
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
 
@@ -539,12 +545,12 @@ function StandingOrders.cloneOrdersConfirm()
   headerRow[1]:setColSpan(8):createText(ReadText(1001, 3225), Helper.headerRowCenteredProperties) -- Order Queue
 
   local tableHeaderRow = ftable:addRow(false, { fixed = true })
-  tableHeaderRow[1]:createText(ReadText(1001, 7802), Helper.headerRowCenteredProperties) -- Orders
-  tableHeaderRow[2]:setColSpan(2):createText(ReadText(1001, 45), Helper.headerRowCenteredProperties) -- Ware
-  tableHeaderRow[4]:createText(ReadText(1001, 1202), Helper.headerRowCenteredProperties) -- Amount
-  tableHeaderRow[5]:createText(ReadText(1001, 2808), Helper.headerRowCenteredProperties) -- Price
-  tableHeaderRow[6]:setColSpan(3):createText(ReadText(1041, 10049), Helper.headerRowCenteredProperties) -- Location
-  tableHeaderRow[9]:setColSpan(4):createText(ReadText(1001, 2809), Helper.headerRowCenteredProperties) -- Name
+  tableHeaderRow[1]:createText(ReadText(1001, 7802), Helper.headerRow1Properties) -- Orders
+  tableHeaderRow[2]:setColSpan(2):createText(ReadText(1001, 45), Helper.headerRow1Properties) -- Ware
+  tableHeaderRow[4]:createText(ReadText(1001, 1202), Helper.headerRow1Properties) -- Amount
+  tableHeaderRow[5]:createText(ReadText(1001, 2808), Helper.headerRow1Properties) -- Price
+  tableHeaderRow[6]:setColSpan(3):createText(ReadText(1041, 10049), Helper.headerRow1Properties) -- Location
+  tableHeaderRow[9]:setColSpan(5):createText(ReadText(1001, 2809), Helper.headerRow1Properties) -- Name
 
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
@@ -572,7 +578,7 @@ function StandingOrders.cloneOrdersConfirm()
         if (#locations > 1) then
           locName = locName .. ", ..."
         end
-        row[6]:setColSpan(3):createText(locName, {halign = "center"})
+        row[6]:setColSpan(3):createText(locName)
       else
         row[6]:setColSpan(3):createText("-", {halign = "center"})
       end
@@ -581,22 +587,22 @@ function StandingOrders.cloneOrdersConfirm()
     end
     if i <= #targetIds then
       local targetName = getShipName(targetIds[i])
-      row[9]:setColSpan(4):createText(tostring(targetName), {halign = "left"})
+      row[9]:setColSpan(5):createText(tostring(targetName), {halign = "left", color = Color["text_player_current"]})
     else
-      row[9]:setColSpan(4):createText("", {halign = "center"})
+      row[9]:setColSpan(5):createText("", {halign = "center"})
     end
   end
 
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
   local buttonRow = ftable:addRow(true, { fixed = true })
-  buttonRow[9]:setColSpan(2):createButton():setText(ReadText(1001, 2821), { halign = "center" })
-  buttonRow[9].handlers.onClick = function ()
+  buttonRow[10]:setColSpan(2):createButton():setText(ReadText(1001, 2821), { halign = "center" })
+  buttonRow[10].handlers.onClick = function ()
     StandingOrders.cloneOrdersExecute()
     menu.closeContextMenu("back")
   end
-  buttonRow[11]:setColSpan(2):createButton():setText(ReadText(1001, 64), { halign = "center" })
-  buttonRow[11].handlers.onClick = function ()
+  buttonRow[12]:setColSpan(2):createButton():setText(ReadText(1001, 64), { halign = "center" })
+  buttonRow[12].handlers.onClick = function ()
     StandingOrders.cloneOrdersCancel()
     menu.closeContextMenu("back")
   end
@@ -605,9 +611,9 @@ function StandingOrders.cloneOrdersConfirm()
     StandingOrders.clearSource()
     menu.closeContextMenu("back")
   end
-  ftable:setSelectedCol(11)
+  ftable:setSelectedCol(12)
 
-  frame.properties.height = math.min(Helper.viewHeight - frame.properties.y, frame:getUsedHeight() + Helper.borderSize)
+  centerFrameVertically(frame)
 
   frame:display()
 
