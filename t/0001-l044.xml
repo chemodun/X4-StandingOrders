@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English -->
+<diff>
+  <add sel="/language">
+    <page id="1972092408" voice="no" title="Standing Orders" descr="Text for Standing Orders">
+      <t id="1">Standing Orders</t>
+      <t id="10101">Select as Source</t>
+      <t id="10110">Invalid Source Ship</t>
+      <t id="10111">Orders cannot be cloned from '%s' due to %s!</t>
+      <t id="10121">Invalid Ship ID</t>
+      <t id="10122">Is not a Ship</t>
+      <t id="10123">Not Owned by Player</t>
+      <t id="10124">Not Operational</t>
+      <t id="10125">No appropriate Cargo Type</t>
+      <t id="10131">Repeat Order not Enabled</t>
+      <t id="10132">No Standing Orders</t>
+      <t id="10133">Not supported Standing Order</t>
+      <t id="10201">Deselect as Source</t>
+      <t id="10301">Clone from %s</t>
+      <t id="10310">No valid targets selected</t>
+      <t id="10311">Orders can't be cloned as no valid targets are selected!</t>
+      <t id="10320">Confirm cloning orders</t>
+      <t id="10321">Source: %s</t>
+      <t id="10322">Target ships:</t>
+    </page>
+  </add>
+</diff>

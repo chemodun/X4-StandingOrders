@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Turkish -->
+<diff>
+  <add sel="/language">
+    <page id="1972092408" voice="no" title="Sürekli Emirler" descr="Sürekli Emirler metni">
+      <t id="1">Sürekli Emirler</t>
+      <t id="10101">Kaynak olarak seç</t>
+      <t id="10110">Geçersiz kaynak gemi</t>
+      <t id="10111">'%s' gemisinden %s nedeniyle emirler kopyalanamıyor!</t>
+      <t id="10121">Geçersiz gemi kimliği</t>
+      <t id="10122">Bir gemi değil</t>
+      <t id="10123">Oyuncuya ait değil</t>
+      <t id="10124">Çalışır durumda değil</t>
+      <t id="10125">Uygun yük türü yok</t>
+      <t id="10131">Tekrarlama emri etkin değil</t>
+      <t id="10132">Sürekli emir yok</t>
+      <t id="10133">Desteklenmeyen sürekli emir</t>
+      <t id="10201">Kaynak olarak seçimi kaldır</t>
+      <t id="10301">%s kaynağından kopyala</t>
+      <t id="10310">Geçerli hedef seçilmedi</t>
+      <t id="10311">Geçerli hedefler seçilmediği için emirler kopyalanamıyor!</t>
+      <t id="10320">Emir kopyalamayı onayla</t>
+      <t id="10321">Kaynak: %s</t>
+      <t id="10322">Hedef gemiler:</t>
+    </page>
+  </add>
+</diff>

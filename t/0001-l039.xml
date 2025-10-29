@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Italian -->
+<diff>
+  <add sel="/language">
+    <page id="1972092408" voice="no" title="Ordini Permanenti" descr="Testo per Ordini Permanenti">
+      <t id="1">Ordini Permanenti</t>
+      <t id="10101">Seleziona come origine</t>
+      <t id="10110">Nave sorgente non valida</t>
+      <t id="10111">Impossibile clonare gli ordini da '%s' a causa di %s!</t>
+      <t id="10121">ID nave non valido</t>
+      <t id="10122">Non è una nave</t>
+      <t id="10123">Non appartiene al giocatore</t>
+      <t id="10124">Non è operativa</t>
+      <t id="10125">Nessun tipo di carico appropriato</t>
+      <t id="10131">Ordine ripetuto non abilitato</t>
+      <t id="10132">Nessun ordine permanente</t>
+      <t id="10133">Ordine permanente non supportato</t>
+      <t id="10201">Deseleziona come origine</t>
+      <t id="10301">Clona da %s</t>
+      <t id="10310">Nessun bersaglio valido selezionato</t>
+      <t id="10311">Impossibile clonare gli ordini perché non sono stati selezionati bersagli validi!</t>
+      <t id="10320">Conferma clonazione ordini</t>
+      <t id="10321">Origine: %s</t>
+      <t id="10322">Navi bersaglio:</t>
+    </page>
+  </add>
+</diff>

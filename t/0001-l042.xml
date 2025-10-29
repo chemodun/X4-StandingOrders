@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Czech -->
+<diff>
+  <add sel="/language">
+    <page id="1972092408" voice="no" title="Trvalé příkazy" descr="Text pro Trvalé příkazy">
+      <t id="1">Trvalé příkazy</t>
+      <t id="10101">Vybrat jako zdroj</t>
+      <t id="10110">Neplatná zdrojová loď</t>
+      <t id="10111">Nelze klonovat rozkazy z '%s' kvůli %s!</t>
+      <t id="10121">Neplatné ID lodi</t>
+      <t id="10122">Není loď</t>
+      <t id="10123">Nevlastní hráč</t>
+      <t id="10124">Není provozuschopná</t>
+      <t id="10125">Chybí vhodný typ nákladu</t>
+      <t id="10131">Opakovaný příkaz není povolen</t>
+      <t id="10132">Žádné trvalé příkazy</t>
+      <t id="10133">Nepodporovaný trvalý příkaz</t>
+      <t id="10201">Zrušit výběr jako zdroj</t>
+      <t id="10301">Klonovat z %s</t>
+      <t id="10310">Nejsou vybrány žádné platné cíle</t>
+      <t id="10311">Příkazy nelze klonovat, protože nejsou vybrány žádné platné cíle!</t>
+      <t id="10320">Potvrdit klonování příkazů</t>
+      <t id="10321">Zdroj: %s</t>
+      <t id="10322">Cílové lodě:</t>
+    </page>
+  </add>
+</diff>

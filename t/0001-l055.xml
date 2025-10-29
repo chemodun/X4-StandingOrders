@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Portuguese -->
+<diff>
+  <add sel="/language">
+    <page id="1972092408" voice="no" title="Ordens Permanentes" descr="Texto para Ordens Permanentes">
+      <t id="1">Ordens Permanentes</t>
+      <t id="10101">Selecionar como origem</t>
+      <t id="10110">Nave de origem inválida</t>
+      <t id="10111">Não é possível clonar ordens de '%s' devido a %s!</t>
+      <t id="10121">ID de nave inválido</t>
+      <t id="10122">Não é uma nave</t>
+      <t id="10123">Não pertence ao jogador</t>
+      <t id="10124">Não está operacional</t>
+      <t id="10125">Sem tipo de carga apropriado</t>
+      <t id="10131">Ordem repetida desativada</t>
+      <t id="10132">Sem ordens permanentes</t>
+      <t id="10133">Ordem permanente não suportada</t>
+      <t id="10201">Desmarcar como origem</t>
+      <t id="10301">Clonar de %s</t>
+      <t id="10310">Nenhum alvo válido selecionado</t>
+      <t id="10311">Não é possível clonar as ordens, pois nenhum alvo válido foi selecionado!</t>
+      <t id="10320">Confirmar clonagem de ordens</t>
+      <t id="10321">Origem: %s</t>
+      <t id="10322">Naves alvo:</t>
+    </page>
+  </add>
+</diff>

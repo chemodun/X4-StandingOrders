@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Polish -->
+<diff>
+  <add sel="/language">
+    <page id="1972092408" voice="no" title="Polecenia stałe" descr="Tekst dla Poleceń stałych">
+      <t id="1">Polecenia stałe</t>
+      <t id="10101">Wybierz jako źródło</t>
+      <t id="10110">Nieprawidłowy statek źródłowy</t>
+      <t id="10111">Nie można sklonować poleceń ze statku '%s' z powodu %s!</t>
+      <t id="10121">Nieprawidłowy identyfikator statku</t>
+      <t id="10122">To nie jest statek</t>
+      <t id="10123">Nie należy do gracza</t>
+      <t id="10124">Niesprawny</t>
+      <t id="10125">Brak odpowiedniego rodzaju ładunku</t>
+      <t id="10131">Polecenie powtarzania nieaktywne</t>
+      <t id="10132">Brak poleceń stałych</t>
+      <t id="10133">Nieobsługiwane polecenie stałe</t>
+      <t id="10201">Odznacz jako źródło</t>
+      <t id="10301">Sklonuj z %s</t>
+      <t id="10310">Nie wybrano prawidłowych celów</t>
+      <t id="10311">Nie można sklonować poleceń, ponieważ nie wybrano prawidłowych celów!</t>
+      <t id="10320">Potwierdź klonowanie poleceń</t>
+      <t id="10321">Źródło: %s</t>
+      <t id="10322">Statki docelowe:</t>
+    </page>
+  </add>
+</diff>

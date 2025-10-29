@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- German -->
+<diff>
+  <add sel="/language">
+    <page id="1972092408" voice="no" title="Dauerbefehle" descr="Text für Dauerbefehle">
+      <t id="1">Dauerbefehle</t>
+      <t id="10101">Als Quelle auswählen</t>
+      <t id="10110">Ungültiges Quellschiff</t>
+      <t id="10111">Befehle können nicht von '%s' geklont werden, da %s!</t>
+      <t id="10121">Ungültige Schiffs-ID</t>
+      <t id="10122">Ist kein Schiff</t>
+      <t id="10123">Nicht im Besitz des Spielers</t>
+      <t id="10124">Nicht einsatzbereit</t>
+      <t id="10125">Kein passender Frachttyp</t>
+      <t id="10131">Wiederholungsbefehl nicht aktiviert</t>
+      <t id="10132">Keine Dauerbefehle</t>
+      <t id="10133">Nicht unterstützter Dauerbefehl</t>
+      <t id="10201">Als Quelle abwählen</t>
+      <t id="10301">Von %s klonen</t>
+      <t id="10310">Keine gültigen Ziele ausgewählt</t>
+      <t id="10311">Befehle können nicht geklont werden, da keine gültigen Ziele ausgewählt wurden!</t>
+      <t id="10320">Klonen der Befehle bestätigen</t>
+      <t id="10321">Quelle: %s</t>
+      <t id="10322">Zielschiffe:</t>
+    </page>
+  </add>
+</diff>

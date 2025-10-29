@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- French -->
+<diff>
+  <add sel="/language">
+    <page id="1972092408" voice="no" title="Ordres Permanents" descr="Texte pour Ordres Permanents">
+      <t id="1">Ordres Permanents</t>
+      <t id="10101">Sélectionner comme source</t>
+      <t id="10110">Vaisseau source invalide</t>
+      <t id="10111">Impossible de cloner les ordres depuis '%s' en raison de %s !</t>
+      <t id="10121">Identifiant de vaisseau invalide</t>
+      <t id="10122">N'est pas un vaisseau</t>
+      <t id="10123">N'appartient pas au joueur</t>
+      <t id="10124">N'est pas opérationnel</t>
+      <t id="10125">Aucun type de cargaison approprié</t>
+      <t id="10131">Ordre répété non activé</t>
+      <t id="10132">Aucun ordre permanent</t>
+      <t id="10133">Ordre permanent non pris en charge</t>
+      <t id="10201">Désélectionner comme source</t>
+      <t id="10301">Cloner depuis %s</t>
+      <t id="10310">Aucune cible valide sélectionnée</t>
+      <t id="10311">Impossible de cloner les ordres car aucune cible valide n'est sélectionnée !</t>
+      <t id="10320">Confirmer le clonage des ordres</t>
+      <t id="10321">Source : %s</t>
+      <t id="10322">Vaisseaux cibles :</t>
+    </page>
+  </add>
+</diff>
