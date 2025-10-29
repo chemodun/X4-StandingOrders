@@ -633,10 +633,10 @@ function StandingOrders.ProcessRequest(_, _)
         StandingOrders.showSourceAlert(errorData)
         StandingOrders.reportError(errorData)
       end
-    elseif args.command == "unmark_source" then
+    elseif StandingOrders.args.command == "unmark_source" then
       StandingOrders.MarkSourceOnMap()
-    elseif args.command == "clone_orders" then
-      local valid, errorData = StandingOrders.cloneOrdersPrepare(args)
+    elseif StandingOrders.args.command == "clone_orders" then
+      local valid, errorData = StandingOrders.cloneOrdersPrepare()
       if valid then
         StandingOrders.cloneOrdersConfirm()
       else
