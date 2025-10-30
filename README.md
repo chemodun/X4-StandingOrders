@@ -17,7 +17,7 @@ Standing Orders adds a lightweight interface that lets you clone Repeat Orders t
 
 ## Installation
 
-You can download the latest version via Steam client - [Standing Orders](https://steamcommunity.com/sharedfiles/filedetails/?id=)
+You can download the latest version via Steam client - [Standing Orders](https://steamcommunity.com/sharedfiles/filedetails/?id=3596138453)
 Or you can do it via the Nexus Mods - [Standing Orders](https://www.nexusmods.com/x4foundations/mods/1871)
 
 ## Usage
