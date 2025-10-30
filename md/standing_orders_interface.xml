@@ -18,14 +18,22 @@
           </actions>
         </cue>
 
-        <cue name="Reloaded" instantiate="true">
+        <cue name="On_Game_Loaded" instantiate="true">
           <conditions>
-            <event_cue_signalled />
             <event_game_loaded />
           </conditions>
           <actions>
-            <debug_text text="'StandingOrders: Reloaded'"
-              chance="100" filter="general" />
+            <debug_text text="'StandingOrders: On_Game_Loaded'" chance="100" filter="general" />
+            <signal_cue_instantly cue="Reloaded" />
+          </actions>
+        </cue>
+
+        <cue name="Reloaded" instantiate="true">
+          <conditions>
+            <event_cue_signalled />
+          </conditions>
+          <actions>
+            <debug_text text="'StandingOrders: Reloaded'" chance="100" filter="general" />
             <set_value name="$sourceShipForCloning" exact="null" />
           </actions>
         </cue>
