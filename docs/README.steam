@@ -20,7 +20,7 @@ Standing Orders adds a lightweight interface that lets you clone Repeat Orders t
 [h2][b]Installation[/b][/h2]
 
 You can download the latest version via Steam client - [url=https://steamcommunity.com/sharedfiles/filedetails/?id=]Standing Orders[/url]
-Or you can do it via the Nexus Mods - [url=https://www.nexusmods.com/x4foundations/mods/]Standing Orders[/url]
+Or you can do it via the Nexus Mods - [url=https://www.nexusmods.com/x4foundations/mods/1871]Standing Orders[/url]
 
 [h2][b]Usage[/b][/h2]
 
@@ -85,6 +85,11 @@ After confirming the cloning operation, the selected target ships will receive t
 [img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/second_target_after_cloning.png[/img]
 
 You can compare it with example of the source ship's Repeat Orders shown at the beginning of [b]Usage[/b] chapter.
+
+[h2][b]Video[/b][/h2]
+
+Video demonstration of the Standing Orders. Version 1.00
+[previewyoutube=lTWG6vBWIhc;full][/previewyoutube]
 
 [h2][b]Credits[/b][/h2]
 [list]
