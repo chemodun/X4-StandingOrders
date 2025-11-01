@@ -386,8 +386,6 @@ function StandingOrders.alertMessage(options)
   local title = options.title
   local message = options.message
 
-  local onClose = options.onClose
-
   menu.closeContextMenu()
 
   menu.contextMenuMode = "standing_orders_alert"
@@ -431,9 +429,6 @@ function StandingOrders.alertMessage(options)
   buttonRow[3]:createButton():setText(okLabel, { halign = "center" })
   buttonRow[3].handlers.onClick = function ()
     local shouldClose = true
-    if type(onClose) == "function" then
-      shouldClose = onClose(menu, sourceId) ~= false
-    end
     if shouldClose then
       menu.closeContextMenu("back")
     end
@@ -557,11 +552,16 @@ function StandingOrders.cloneOrdersConfirm()
   local orders = StandingOrders.getStandingOrders(sourceId)
   local cargoCapacity = StandingOrders.getCargoCapacity(sourceId)
   local lineCount = math.max(#orders, #targetIds)
+  local instance = "left"
+  menu.infoTableData[instance] = {}
+  menu.infoTableData[instance].orders = {}
   for i = 1, lineCount do
     local row = ftable:addRow(false)
     if i <= #orders then
       local order = orders[i]
+      menu.infoTableData[instance].orders[i] = {}
       local orderparams = GetOrderParams(sourceId, order.idx)
+      menu.infoTableData[instance].orders[i].params = orderparams
       row[1]:createText(StandingOrders.validOrders[order.order], {halign = "left"})
       row[2]:setColSpan(2):createText(GetWareData(orderparams[1].value, "name"), {halign = "left"})
       local amount = orderparams[5].value
@@ -611,11 +611,122 @@ function StandingOrders.cloneOrdersConfirm()
     StandingOrders.clearSource()
     menu.closeContextMenu("back")
   end
+
+  buttonRow[4]:setColSpan(2):createButton():setText('Add Location', { halign = "center" })
+  buttonRow[4].handlers.onClick = function ()
+    return StandingOrders.SetOrderParam(1, 4, 1, nil, instance)
+  end
   ftable:setSelectedCol(12)
 
   centerFrameVertically(frame)
 
   frame:display()
+end
+
+function StandingOrders.setOrderParamFromMode(orderIdx, paramIdx, subIdx, value, instance)
+  debugTrace("setOrderParamFromMode called for orderIdx " .. tostring(orderIdx) .. ", paramIdx " .. tostring(paramIdx) .. ", subIdx " .. tostring(subIdx) .. ", value " .. tostring(value) .. ", instance " .. tostring(instance))
+  local menu = StandingOrders.mapMenu
+  menu.resetOrderParamMode()
+  StandingOrders.cloneOrdersConfirm()
+end
+
+function StandingOrders.SetOrderParam(orderIdx, paramIdx, subIdx, value, instance)
+  local menu = StandingOrders.mapMenu
+  local paramdata = menu.infoTableData[instance].orders[orderIdx].params[paramIdx]
+  local paramtype, oldvalue
+  if paramdata.type == "list" then
+    paramtype = paramdata.inputparams.type
+    if not paramtype then
+      DebugError("Order parameter of type 'list' does not specify a input parameter 'type' [Florian]")
+    end
+    if subIdx then
+      oldvalue = paramdata.value[subIdx]
+    end
+  else
+    paramtype = paramdata.type
+    oldvalue = paramdata.value
+  end
+  if paramtype == "object" then
+    menu.currentInfoMode = { menu.infoTableMode, menu.infoMode.left }
+    menu.infoTableMode = "objectlist"
+    menu.mode = "orderparam_object"
+    local controllable = ConvertStringToLuaID(tostring(StandingOrders.sourceId))
+    local toprow = 1
+    if instance == "left" then
+      toprow = GetTopRow(menu.infoTable)
+    elseif instance == "right" then
+      toprow = GetTopRow(menu.infoTableRight)
+    end
+    menu.modeparam = { function (value) return StandingOrders.setOrderParamFromMode(orderIdx, paramIdx, subIdx, value, instance) end, paramdata, toprow, controllable, orderIdx, paramIdx }
+
+    C.SetMapOrderParamObjectFilter(menu.holomap, ConvertStringTo64Bit(tostring(menu.modeparam[4])), menu.modeparam[5], menu.modeparam[6])
+
+    menu.settoprow = 0
+
+    menu.closeContextMenu()
+    menu.refreshInfoFrame()
+    menu.refreshMainFrame = true
+  elseif paramtype == "ware" then
+    --[[ if value then
+      local object64 = ConvertStringTo64Bit(tostring(menu.infoSubmenuObject))
+      if (paramdata.type == "list") and (type(value) == "table") then
+        local skip = true
+
+        local sorted = {}
+        for ware in pairs(value) do
+          table.insert(sorted, ware)
+        end
+        -- we want to re-add the complete list to keep it alphabetical
+        if not paramdata.value then
+          -- no values yet, we need to set
+          skip = false
+        else
+          if #paramdata.value ~= #sorted then
+            -- number is not the same, we need to set
+            skip = false
+          else
+            for _, ware in ipairs(paramdata.value) do
+              if not value[ware] then
+                -- exisiting value not in new list, we need to set
+                skip = false
+                break
+              end
+            end
+            -- if skip is still true here, all existing values are in the new list and previous check excludes the case of only new entries added, nothing to do
+          end
+          if not skip then
+            -- remove all old
+            for listidx = #paramdata.value, 1, -1 do
+              RemoveOrderListParam(object64, order, param, listidx)
+            end
+          end
+        end
+        if not skip then
+          -- add all new
+          table.sort(sorted, Helper.sortWareName)
+          for _, ware in ipairs(sorted) do
+            SetOrderParam(object64, order, param, nil, ware)
+          end
+        end
+      else
+        SetOrderParam(object64, order, param, index, value)
+        AddUITriggeredEvent(menu.name, "orderparam_" .. paramdata.name, value)
+      end
+      menu.closeContextMenu()
+      Helper.clearTableConnectionColumn(menu, 3)
+      menu.refreshInfoFrame()
+    else
+      menu.contextMenuMode = "set_orderparam_ware"
+      menu.contextMenuData = { order = order, param = param, index = index, instance = instance }
+      local offsetx = menu.infoTableOffsetX + menu.infoTableWidth + config.contextBorder
+      if instance == "right" then
+        offsetx = Helper.viewWidth - offsetx - config.orderqueueContextWidth
+      end
+      menu.createContextFrame(config.orderqueueContextWidth, Helper.viewHeight - menu.infoTableOffsetY, offsetx, menu.infoTableOffsetY)
+    end ]]
+  else
+    debugTrace("SetOrderParam: unsupported parameter type " .. tostring(paramtype))
+  end
 end
 
 function StandingOrders.cloneOrdersExecute()
