@@ -146,7 +146,7 @@
           </actions>
         </cue>
 
-        <cue name="Process_Menu" version="2" instantiate="true">
+        <cue name="Process_Menu" version="3" instantiate="true">
           <conditions>
             <event_cue_signalled />
           </conditions>
@@ -171,12 +171,14 @@
                 <append_to_list name="$targetList" exact="@event.param.$object" />
                 <do_if value="@$params.$selectedplayerships.count gt 0">
                   <do_for_each name="$ship" in="@$params.$selectedplayerships">
+                    <!-- Each selected ship is checked on its own, and the source can never be a target of itself. -->
                     <do_if
                       value="@$ship != @event.param.$object and
-                      @event.param.$object.isclass.{class.ship} and
-                      @event.param.$object.trueowner == faction.player and
-                      @event.param.$object.isoperational and
-                      not @event.param.$object.iswreck">
+                      @$ship != @$sourceShipForCloning and
+                      @$ship.isclass.{class.ship} and
+                      @$ship.trueowner == faction.player and
+                      @$ship.isoperational and
+                      not @$ship.iswreck">
                       <append_to_list name="$targetList" exact="@$ship" />
                     </do_if>
                   </do_for_each>

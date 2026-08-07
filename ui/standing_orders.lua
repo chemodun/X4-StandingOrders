@@ -553,7 +553,9 @@ function StandingOrders.buildPreviewLines(sourceId)
     local sourceCapacity = transportType and StandingOrders.getCargoCapacity(sourceId, transportType) or nil
     for paramIdx = 1, #orderParams do
       local param = orderParams[paramIdx]
-      if param.type ~= "internal" and param.value ~= nil then
+      -- Vanilla's order queue hides advanced params unless the panel is in advanced mode. This
+      -- only filters the preview; cloneOrdersExecute still copies them.
+      if param.type ~= "internal" and param.value ~= nil and not param.advanced then
         local label = param.text
         if label == nil or label == "" then
           label = tostring(param.name)
@@ -579,9 +581,11 @@ function StandingOrders.cloneOrdersPrepare()
   local targetIds = {}
   for i = 1, #targets do
     local targetId = toUniverseId(targets[i])
-    local valid, errorData = StandingOrders.isValidTargetShip(targetId, transportTypes)
-    if valid then
-      targetIds[#targetIds + 1] = targetId
+    if targetId ~= StandingOrders.sourceId then
+      local valid, errorData = StandingOrders.isValidTargetShip(targetId, transportTypes)
+      if valid then
+        targetIds[#targetIds + 1] = targetId
+      end
     end
   end
   if #targetIds == 0 then
@@ -725,11 +729,31 @@ function StandingOrders.cloneOrdersExecute()
   local sourceOrders = StandingOrders.getStandingOrders(sourceId)
   local targets = StandingOrders.targetIds
   local transportTypes = StandingOrders.collectSourceTransportTypes(sourceId, sourceOrders)
+
+  -- Snapshot the source up front: clearing a target's queue must never be able to invalidate
+  -- what we still have to read from the source.
+  local snapshot = {}
+  for j = 1, #sourceOrders do
+    local order = sourceOrders[j]
+    local orderParams = GetOrderParams(sourceId, order.idx) or {}
+    if #orderParams > 0 then
+      local transportType = findWareTransportType(orderParams)
+      snapshot[#snapshot + 1] = {
+        order = order.order,
+        params = orderParams,
+        transportType = transportType,
+        sourceCapacity = transportType and StandingOrders.getCargoCapacity(sourceId, transportType) or nil,
+      }
+    end
+  end
+
   local processedOrders = 0
   for i = 1, #targets do
     local targetId = targets[i]
     debugTrace("Cloning orders to target " .. getShipName(targetId))
-    if not StandingOrders.checkShip(targetId, transportTypes) then
+    if targetId == sourceId then
+      debugTrace("skipping target " .. getShipName(targetId) .. " - it is the source ship")
+    elseif not StandingOrders.checkShip(targetId, transportTypes) then
       debugTrace("skipping target " .. getShipName(targetId) .. " - no longer valid")
     elseif not C.RemoveAllOrders(targetId) then
       debugTrace("failed to clear target order queue for " .. getShipName(targetId))
@@ -737,42 +761,38 @@ function StandingOrders.cloneOrdersExecute()
       C.CreateOrder(targetId, "Wait", true)
       C.EnablePlannedDefaultOrder(targetId, false)
       C.SetOrderLoop(targetId, 0, false)
-      for j = 1, #sourceOrders do
-        local order = sourceOrders[j]
-        local orderParams = GetOrderParams(sourceId, order.idx) or {}
-        if #orderParams > 0 then
-          local transportType = findWareTransportType(orderParams)
-          local sourceCapacity = transportType and StandingOrders.getCargoCapacity(sourceId, transportType) or nil
-          local newOrderIdx = C.CreateOrder(targetId, order.order, false)
-          if newOrderIdx and newOrderIdx > 0 then
-            local targetCapacity = transportType and StandingOrders.getCargoCapacity(targetId, transportType) or nil
-            for paramIdx = 1, #orderParams do
-              local param = orderParams[paramIdx]
-              if param.type ~= "internal" then
-                if param.type == "list" then
-                  for l = 1, #(param.value or {}) do
-                    SetOrderParam(targetId, newOrderIdx, paramIdx, nil, param.value[l])
-                  end
-                else
-                  local value = param.value
-                  if param.type == "money" then
-                    -- GetOrderParams returns display scale, SetOrderParam expects x100
-                    value = value * 100
-                  elseif param.type == "position" then
-                    value = { ConvertStringToLuaID(tostring(value[1])), { value[2].x, value[2].y, value[2].z } }
-                  elseif isCargoBoundParam(param, sourceCapacity) then
-                    value = (sourceCapacity > 0) and math.floor(value / sourceCapacity * targetCapacity) or 0
-                  end
-                  SetOrderParam(targetId, newOrderIdx, paramIdx, nil, value)
+      for j = 1, #snapshot do
+        local order = snapshot[j]
+        local sourceCapacity = order.sourceCapacity
+        local newOrderIdx = C.CreateOrder(targetId, order.order, false)
+        if newOrderIdx and newOrderIdx > 0 then
+          local targetCapacity = order.transportType and StandingOrders.getCargoCapacity(targetId, order.transportType) or nil
+          for paramIdx = 1, #order.params do
+            local param = order.params[paramIdx]
+            if param.type ~= "internal" then
+              if param.type == "list" then
+                for l = 1, #(param.value or {}) do
+                  SetOrderParam(targetId, newOrderIdx, paramIdx, nil, param.value[l])
                 end
+              else
+                local value = param.value
+                if param.type == "money" then
+                  -- GetOrderParams returns display scale, SetOrderParam expects x100
+                  value = value * 100
+                elseif param.type == "position" then
+                  value = { ConvertStringToLuaID(tostring(value[1])), { value[2].x, value[2].y, value[2].z } }
+                elseif isCargoBoundParam(param, sourceCapacity) then
+                  value = (sourceCapacity > 0) and math.floor(value / sourceCapacity * targetCapacity) or 0
+                end
+                SetOrderParam(targetId, newOrderIdx, paramIdx, nil, value)
               end
             end
-            debugTrace(" Created order " .. tostring(order.order) .. " on target " .. getShipName(targetId) .. " at index " .. tostring(newOrderIdx))
-            C.EnableOrder(targetId, newOrderIdx)
-            processedOrders = processedOrders + 1
-          else
-            debugTrace(" Failed to create order " .. tostring(order.order) .. " on target " .. getShipName(targetId))
           end
+          debugTrace(" Created order " .. tostring(order.order) .. " on target " .. getShipName(targetId) .. " at index " .. tostring(newOrderIdx))
+          C.EnableOrder(targetId, newOrderIdx)
+          processedOrders = processedOrders + 1
+        else
+          debugTrace(" Failed to create order " .. tostring(order.order) .. " on target " .. getShipName(targetId))
         end
       end
     end
