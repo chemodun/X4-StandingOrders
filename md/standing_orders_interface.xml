@@ -2,12 +2,30 @@
 <mdscript name="Standing_Orders_Interface" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <cues>
 
-    <cue name="Main" version="2">
+    <cue name="Main" version="3">
       <actions>
         <debug_text text="'StandingOrders: Main'" chance="100" filter="scripts" />
         <set_value name="$sourceShipForCloning" exact="null" />
       </actions>
       <cues>
+        <!-- A stored source can silently stop being one: sold (owner changes, then MoveDie destroys it),
+             destroyed, boarded or wrecked. Nothing else clears it, so re-check before every use. -->
+        <library name="Validate_Source" purpose="include_actions">
+          <actions>
+            <do_if value="@$sourceShipForCloning != null">
+              <do_if value="@$sourceShipForCloning.exists and
+                            @$sourceShipForCloning.isclass.{class.ship} and
+                            @$sourceShipForCloning.trueowner == faction.player and
+                            @$sourceShipForCloning.isoperational and
+                            not @$sourceShipForCloning.iswreck" negate="true">
+                <debug_text text="'StandingOrders: stored source %s is no longer valid - clearing it'.[@$sourceShipForCloning.debugname]"
+                  chance="100" filter="scripts" />
+                <set_value name="$sourceShipForCloning" exact="null" />
+              </do_if>
+            </do_if>
+          </actions>
+        </library>
+
         <cue name="On_Reload" instantiate="true">
           <conditions>
             <event_ui_triggered screen="'StandingOrders'" control="'Reloaded'" />
@@ -38,7 +56,7 @@
           </actions>
         </cue>
 
-        <cue name="On_Get_Actions" instantiate="true">
+        <cue name="On_Get_Actions" version="2" instantiate="true">
           <conditions>
             <event_cue_signalled cue="md.Interact_Menu_API.Get_Actions" />
             <debug_text text="'StandingOrders: Get_Actions invoked with param: %s'.[event.param]" chance="100" filter="scripts" />
@@ -53,6 +71,7 @@
             <check_value value="@event.param.$object.iswreck" negate="true" />
           </conditions>
           <actions>
+            <include_actions ref="Validate_Source" />
             <set_value name="$params" exact="@event.param" />
             <debug_text
               text="'StandingOrders: sourceShipForCloning: %s, selectedplayerships.count: %s'.[@$sourceShipForCloning, @$params.$selectedplayerships.count]"
@@ -110,26 +129,41 @@
                   $active     = true,
                   $callback   =  Process_Menu
                 ]" />
+              <!-- Also offered here so the source is reachable without flying back to it. -->
+              <signal_cue_instantly
+                cue="md.Interact_Menu_API.Add_Action"
+                param="table[
+                  $id         = 'player_standing_orders_deselect_source',
+                  $section    = $menuSection,
+                  $text       = '[&#8734;]: %s'.[{1972092408, 10201}],
+                  $text2      = @$sourceFullName,
+                  $mouseover  = '[%s]: %s - %s'.[{1972092408, 1}, @$sourceFullName, {1972092408, 10201}],
+                  $icon       = 'menu_reset',
+                  $active     = true,
+                  $callback   =  Process_Menu
+                ]" />
             </do_else>
           </actions>
         </cue>
 
-        <cue name="Process_Menu" instantiate="true">
+        <cue name="Process_Menu" version="2" instantiate="true">
           <conditions>
             <event_cue_signalled />
           </conditions>
           <actions>
             <debug_text text="'StandingOrders: Process_Menu invoked with param: %s'.[event.param]" chance="100" filter="scripts" />
+            <include_actions ref="Validate_Source" />
             <set_value name="$args" exact="null" />
             <do_if value="@event.param.$id == 'player_standing_orders_select_source' or @event.param.$id == 'player_standing_orders_deselect_source'">
-              <set_value name="$sourceShipForCloning" exact="null" />
-              <debug_text text="'StandingOrders: Deselected source for cloning. Current source: %s'.[@$sourceShipForCloning]" chance="100"
-                filter="scripts" />
+              <!-- Built before clearing: a deselect raised from another ship must still name the stored source. -->
               <set_value name="$args"
                 exact="table[
                   $command            = if @event.param.$id == 'player_standing_orders_select_source' then 'mark_source' else 'unmark_source',
-                  $source             = @event.param.$object,
+                  $source             = if @event.param.$id == 'player_standing_orders_select_source' then @event.param.$object else @$sourceShipForCloning,
                 ]" />
+              <set_value name="$sourceShipForCloning" exact="null" />
+              <debug_text text="'StandingOrders: Deselected source for cloning. Current source: %s'.[@$sourceShipForCloning]" chance="100"
+                filter="scripts" />
             </do_if>
             <do_elseif value="@event.param.$id == 'player_standing_orders_clone'">
               <do_if value="@$sourceShipForCloning != null">

@@ -115,11 +115,16 @@ local function copyAndEnrichTable(src, extraInfo)
 end
 
 local function getShipName(shipId)
-  if shipId == 0 then
+  if shipId == 0 or not IsValidComponent(shipId) then
     return "Unknown"
   end
   local name = GetComponentData(ConvertStringToLuaID(tostring(shipId)), "name")
-  local idCode = ffi.string(C.GetObjectIDCode(shipId))
+  if not name then
+    return "Unknown"
+  end
+  -- GetObjectIDCode returns NULL for a component that died since the id was cached
+  local idCodePtr = C.GetObjectIDCode(shipId)
+  local idCode = (idCodePtr ~= nil) and ffi.string(idCodePtr) or ""
   return string.format("%s (%s)", name, idCode)
 end
 
@@ -199,7 +204,7 @@ end
 
 function StandingOrders.checkShip(shipId)
   local shipId = toUniverseId(shipId)
-  if shipId == 0 then
+  if shipId == 0 or not IsValidComponent(shipId) then
     return false, { info = "InvalidShipID" }
   end
   local isShip = C.IsComponentClass(shipId, "ship")
@@ -598,8 +603,11 @@ function StandingOrders.cloneOrdersConfirm()
   local buttonRow = ftable:addRow(true, { fixed = true })
   buttonRow[10]:setColSpan(2):createButton():setText(ReadText(1001, 2821), { halign = "center" })
   buttonRow[10].handlers.onClick = function ()
-    StandingOrders.cloneOrdersExecute()
+    local valid, errorData = StandingOrders.cloneOrdersExecute()
     menu.closeContextMenu("back")
+    if not valid then
+      StandingOrders.showSourceAlert(errorData)
+    end
   end
   buttonRow[12]:setColSpan(2):createButton():setText(ReadText(1001, 64), { halign = "center" })
   buttonRow[12].handlers.onClick = function ()
@@ -730,6 +738,14 @@ function StandingOrders.SetOrderParam(orderIdx, paramIdx, subIdx, value, instanc
 end
 
 function StandingOrders.cloneOrdersExecute()
+  -- The confirmation dialog stays open until the player acts; source and targets can die in between.
+  local valid, errorData = StandingOrders.checkShip(StandingOrders.sourceId)
+  if not valid then
+    debugTrace("source is no longer valid at execution time - aborting")
+    StandingOrders.cloneOrdersReset()
+    StandingOrders.reportError(errorData)
+    return false, errorData
+  end
   debugTrace("Executing clone orders from source " .. getShipName(StandingOrders.sourceId) .. " to " .. tostring(#StandingOrders.targetIds) .. " targets")
   local sourceOrders = StandingOrders.getStandingOrders(StandingOrders.sourceId)
   local targets = StandingOrders.targetIds
@@ -738,7 +754,9 @@ function StandingOrders.cloneOrdersExecute()
   for i = 1, #targets do
     local targetId = targets[i]
     debugTrace("Cloning orders to target " .. getShipName(targetId))
-    if not C.RemoveAllOrders(targetId) then
+    if not StandingOrders.checkShip(targetId) then
+      debugTrace("skipping target " .. getShipName(targetId) .. " - no longer valid")
+    elseif not C.RemoveAllOrders(targetId) then
       debugTrace("failed to clear target order queue for " .. getShipName(targetId))
     else
       C.CreateOrder(targetId, "Wait", true)
@@ -778,6 +796,7 @@ function StandingOrders.cloneOrdersExecute()
   else
     StandingOrders.reportSuccess({ info = "OrdersCloned", details = string.format("%d orders cloned to %d targets", processedOrders, #targets) })
   end
+  return true
 end
 
 function StandingOrders.cloneOrdersCancel()
@@ -822,7 +841,7 @@ function StandingOrders.ProcessRequest(_, _)
         StandingOrders.reportError(errorData)
       end
     else
-      debugTrace("ProcessRequest received unknown command: " .. tostring(args.command))
+      debugTrace("ProcessRequest received unknown command: " .. tostring(StandingOrders.args.command))
       StandingOrders.reportError({ info = "UnknownCommand" })
     end
   else
