@@ -96,6 +96,9 @@ local StandingOrders = {
   -- Set while a value picker replaces the dialog; nil means the dialog itself is showing.
   ---@type table?
   picker = nil,
+  -- Set while the player is picking an object or a position on the map, with the dialog taken down.
+  ---@type table?
+  picking = nil,
 }
 
 -- Param types the dialog can edit in place. The rest render as vanilla does but stay inactive.
@@ -112,6 +115,12 @@ local pickableTypes = {
   ware = true,
   sector = true,
   formationshape = true,
+}
+
+-- Param types picked by clicking the map instead, through vanilla's own orderparam modes.
+local mapPickableTypes = {
+  object = true,
+  position = true,
 }
 
 -- Picker frame titles, taken from the vanilla contexts these are ports of.
@@ -657,21 +666,31 @@ function StandingOrders.stagedTransportTypes()
   return list
 end
 
+-- ftable.id is only valid while the table is displayed, so the scroll position has to be read
+-- before anything tears the dialog down -- never from the deferred rebuild.
+function StandingOrders.rememberQueueScroll()
+  local queueTable = StandingOrders.queueTable
+  if queueTable and queueTable.id then
+    StandingOrders.queueTopRow = GetTopRow(queueTable.id)
+  end
+end
+
 -- Rebuilding the frame from inside a widget callback fights closeOnUnhandledClick and the pending
 -- frame teardown, so every mutation defers the rebuild by one update, as ego does for its own
 -- context refreshes. The same deferral swaps between the dialog and a value picker, since the map
 -- menu only ever holds one context frame.
 function StandingOrders.refreshCloneDialog()
-  local queueTable = StandingOrders.queueTable
-  if queueTable and queueTable.id then
-    StandingOrders.queueTopRow = GetTopRow(queueTable.id)
-  end
+  StandingOrders.rememberQueueScroll()
   if StandingOrders.dialogRefreshQueued then
     return
   end
   StandingOrders.dialogRefreshQueued = true
   Helper.addDelayedOneTimeCallbackOnUpdate(function ()
     StandingOrders.dialogRefreshQueued = false
+    if StandingOrders.picking then
+      -- A map pick has the dialog down on purpose; it comes back when the mode ends.
+      return
+    end
     if StandingOrders.sourceId ~= 0 then
       -- The rebuild tears the old frame down and puts an identical one up; that is not the dialog
       -- going away, so the pause must survive it.
@@ -722,8 +741,20 @@ local function pickerKind(param)
   return param.type
 end
 
-local function isPickable(param)
-  return (pickableTypes[pickerKind(param)] == true) and not isParamLocked(param)
+-- How a value for this param can be obtained: "frame" from an own picker frame, "map" by clicking
+-- the map, nil if the dialog cannot supply one.
+local function pickMode(param)
+  if isParamLocked(param) then
+    return nil
+  end
+  local kind = pickerKind(param)
+  if pickableTypes[kind] then
+    return "frame"
+  end
+  if mapPickableTypes[kind] then
+    return "map"
+  end
+  return nil
 end
 
 -- Sector values travel as Lua IDs; the selection map is keyed by the 64-bit form so a value read
@@ -743,6 +774,83 @@ end
 function StandingOrders.buttonClosePicker()
   StandingOrders.picker = nil
   StandingOrders.refreshCloneDialog()
+end
+
+-- Port of the object and position branches of menu.buttonSetOrderParam (menu_map.lua:2976, 3128).
+-- Vanilla's mode machinery does the entire map-side job -- object filter, cursor, top-level banner,
+-- every cancel route -- off menu.mode plus menu.modeparam, so the only piece that is ours is
+-- modeparam[1]. The engine filter is keyed on the source's own order, which the staged entry is
+-- still a copy of; nothing has touched the source queue at this point.
+function StandingOrders.buttonStartMapPick(entry, paramIdx, param, listIdx)
+  local menu = StandingOrders.mapMenu
+  if (menu.holomap == nil) or (menu.holomap == 0) then
+    debugTrace("buttonStartMapPick: no holomap to pick on")
+    return
+  end
+
+  StandingOrders.picking = { param = param, listIdx = listIdx }
+  -- The pick does not go through refreshCloneDialog, so the scroll position has to be taken here.
+  StandingOrders.rememberQueueScroll()
+  StandingOrders.queueTable = nil
+
+  -- Slots 5 and 6 are the order coordinates the object filter needs; position mode leaves them unset
+  -- as vanilla does, and slot 5 must stay a number so ego does not read it as a default order.
+  local isObject = pickerKind(param) == "object"
+  local orderIdx, paramSlot
+  if isObject then
+    orderIdx, paramSlot = entry.sourceIdx, paramIdx
+  end
+  local controllable = ConvertStringToLuaID(tostring(StandingOrders.sourceId))
+  menu.currentInfoMode = { menu.infoTableMode, menu.infoMode.left }
+  menu.modeparam = { StandingOrders.setMapPickValue, param, 1, controllable, orderIdx, paramSlot }
+  menu.settoprow = 0
+  menu.setMouseCursorOverride("target", 3)
+
+  if isObject then
+    menu.infoTableMode = "objectlist"
+    menu.mode = "orderparam_object"
+    C.SetMapOrderParamObjectFilter(menu.holomap, StandingOrders.sourceId, orderIdx, paramSlot)
+    menu.closeContextMenu()
+    menu.refreshInfoFrame()
+    menu.refreshMainFrame = true
+  else
+    menu.mode = "orderparam_position"
+    menu.closeContextMenu()
+    menu.refreshInfoFrame()
+  end
+end
+
+-- Counterpart of menu.setOrderParamFromMode: write into the staged param instead of a live order,
+-- then let vanilla tear its own mode down -- the reset hook is what brings the dialog back.
+function StandingOrders.setMapPickValue(value)
+  local picking = StandingOrders.picking
+  if picking then
+    local param = picking.param
+    -- The map hands a position back as {ref, {x, y, z}} while GetOrderParams uses {ref, {x=, y=,
+    -- z=}}; the staged queue holds one shape only.
+    if pickerKind(param) == "position" then
+      value = { value[1], { x = value[2][1], y = value[2][2], z = value[2][3] } }
+    end
+    if param.type == "list" then
+      param.value = param.value or {}
+      if picking.listIdx then
+        param.value[picking.listIdx] = value
+      else
+        param.value[#param.value + 1] = value
+      end
+    else
+      param.value = value
+    end
+  end
+  StandingOrders.mapMenu.resetOrderParamMode()
+end
+
+function StandingOrders.buttonEditStagedParam(mode, entry, paramIdx, param, listIdx)
+  if mode == "frame" then
+    StandingOrders.buttonOpenPicker(param)
+  elseif mode == "map" then
+    StandingOrders.buttonStartMapPick(entry, paramIdx, param, listIdx)
+  end
 end
 
 function StandingOrders.buttonRemoveStagedListParam(param, listIdx)
@@ -832,8 +940,8 @@ end
 -- Port of menu.displayOrderParam (menu_map.lua:10142) in its hasloop layout: same widgets, same
 -- columns, but every handler writes into the staged param instead of a live order. listParam is the
 -- owning list param when this row renders one of its entries -- it, not the synthetic entry param,
--- is what a picker edits.
-function StandingOrders.addStagedParamRow(zipper, entry, param, listIdx, listParam)
+-- is what an editor edits.
+function StandingOrders.addStagedParamRow(zipper, entry, paramIdx, param, listIdx, listParam)
   local value = param.value
   local ismissing = value == nil
   local active = (not isParamLocked(param)) and (inlineEditableTypes[param.type] == true)
@@ -846,12 +954,14 @@ function StandingOrders.addStagedParamRow(zipper, entry, param, listIdx, listPar
   local paramtext = (param.text ~= "") and ("  " .. param.text .. ReadText(1001, 120)) or ""
 
   if listIdx then
-    local pickable = isPickable(listParam)
+    -- A picker frame edits the list as a whole, a map pick one entry at a time -- so the frame route
+    -- ignores listIdx and the map route carries it, exactly as vanilla splits them.
+    local mode = pickMode(listParam)
     local row = zipper.add(true, {  })
     row[4]:createText(paramtext)
-    row[5]:setColSpan(7):createButton({ active = pickable }):setText(value and tostring(value) or "", { halign = "center", color = paramcolor })
-    row[5].handlers.onClick = function () return StandingOrders.buttonOpenPicker(listParam) end
-    row[12]:createButton({ active = pickable and ((not listParam.required) or (#listParam.value > 1)) }):setText("x", { halign = "center", color = paramcolor })
+    row[5]:setColSpan(7):createButton({ active = mode ~= nil }):setText(value and tostring(value) or "", { halign = "center", color = paramcolor })
+    row[5].handlers.onClick = function () return StandingOrders.buttonEditStagedParam(mode, entry, paramIdx, listParam, listIdx) end
+    row[12]:createButton({ active = (mode ~= nil) and ((not listParam.required) or (#listParam.value > 1)) }):setText("x", { halign = "center", color = paramcolor })
     row[12].handlers.onClick = function () return StandingOrders.buttonRemoveStagedListParam(listParam, listIdx) end
   elseif param.inputparams and (param.type == "number" or param.type == "length" or param.type == "time" or param.type == "money") then
     local defaultmax = 50000
@@ -930,14 +1040,14 @@ function StandingOrders.addStagedParamRow(zipper, entry, param, listIdx, listPar
     row[5]:createCheckBox(function () return param.value ~= nil and param.value ~= 0 end, { active = active, width = Helper.standardTextHeight })
     row[5].handlers.onClick = function () return StandingOrders.checkboxStagedParam(param) end
   else
-    local pickable = isPickable(param)
+    local mode = pickMode(param)
     local row = zipper.add(true, {  })
     row[4]:createText(paramtext)
     row[5]:setColSpan(8)
     local text = value and tostring(value) or (ColorText["text_inactive"] .. ReadText(1001, 3102) .. "...")
     local height = math.max(Helper.standardTextHeight, math.ceil(C.GetTextHeight(text, Helper.standardFont, Helper.standardFontSize, row[5]:getWidth())) + Helper.borderSize)
-    row[5]:createButton({ active = pickable, height = height }):setText(text, { halign = "center", color = paramcolor, y = (height - Helper.standardTextHeight) / 2 })
-    row[5].handlers.onClick = function () return StandingOrders.buttonOpenPicker(param) end
+    row[5]:createButton({ active = mode ~= nil, height = height }):setText(text, { halign = "center", color = paramcolor, y = (height - Helper.standardTextHeight) / 2 })
+    row[5].handlers.onClick = function () return StandingOrders.buttonEditStagedParam(mode, entry, paramIdx, param, nil) end
   end
 end
 
@@ -973,13 +1083,15 @@ function StandingOrders.addStagedOrderRows(zipper)
                 editable = param.editable,
                 playerreadonly = param.inputparams and param.inputparams.playerreadonly,
               }
-              StandingOrders.addStagedParamRow(zipper, entry, param2, k, param)
+              StandingOrders.addStagedParamRow(zipper, entry, j, param2, k, param)
             end
+            -- No listIdx on the add row: a map pick appends there, where an entry row replaces.
+            local mode = pickMode(param)
             local addRow = zipper.add(true, {  })
-            addRow[2]:setColSpan(11):createButton({ active = isPickable(param) }):setText("  " .. string.format(ReadText(1001, 3235), param.text), { halign = "center" })
-            addRow[2].handlers.onClick = function () return StandingOrders.buttonOpenPicker(param) end
+            addRow[2]:setColSpan(11):createButton({ active = mode ~= nil }):setText("  " .. string.format(ReadText(1001, 3235), param.text), { halign = "center" })
+            addRow[2].handlers.onClick = function () return StandingOrders.buttonEditStagedParam(mode, entry, j, param, nil) end
           elseif param.type ~= "internal" then
-            StandingOrders.addStagedParamRow(zipper, entry, param, nil)
+            StandingOrders.addStagedParamRow(zipper, entry, j, param, nil)
           end
         end
       end
@@ -1512,6 +1624,7 @@ function StandingOrders.cloneOrdersReset()
   StandingOrders.targetIds = {}
   StandingOrders.staged = {}
   StandingOrders.picker = nil
+  StandingOrders.picking = nil
   StandingOrders.queueTable = nil
   StandingOrders.queueTopRow = nil
   StandingOrders.applyToSource = false
@@ -1521,6 +1634,13 @@ end
 
 function StandingOrders.ProcessRequest(_, _)
   if StandingOrders.mapMenu and StandingOrders.mapMenu.holomap and (StandingOrders.mapMenu.holomap ~= 0) then
+    -- A request arriving mid-pick would leave the map in a mode pointing at a queue we are about to
+    -- replace, so end the pick first.
+    if StandingOrders.picking then
+      StandingOrders.picking = nil
+      StandingOrders.mapMenu.resetOrderParamMode()
+      StandingOrders.releasePause()
+    end
     if not StandingOrders.getArgs() then
       debugTrace("ProcessRequest invoked without args or invalid args")
       StandingOrders.reportError({info ="missing_args"})
@@ -1583,7 +1703,9 @@ local function hookCloseContextMenu(menu)
       end
       menu.currentMouseOverTable = nil
     end
-    if not StandingOrders.rebuilding then
+    -- A pick takes the dialog down for the map's sake, which is no more the dialog going away than
+    -- a rebuild is; the pause has to survive it too.
+    if not StandingOrders.rebuilding and not StandingOrders.picking then
       if mode == "standing_orders_param_picker" then
         -- The picker has no parent frame to fall back to, so every close route -- its Cancel, the
         -- frame's X, closeOnUnhandledClick -- has to put the dialog back itself.
@@ -1612,7 +1734,36 @@ local function hookCleanup(menu)
   menu.cleanup = function (...)
     StandingOrders.releasePause()
     StandingOrders.picker = nil
+    if StandingOrders.picking then
+      -- cleanup nils menu.mode without going through resetOrderParamMode, which is what would
+      -- normally drop the target cursor.
+      StandingOrders.picking = nil
+      menu.removeMouseCursorOverride(3)
+    end
     return menu.standingOrdersCleanup(...)
+  end
+end
+
+-- Picked, right-clicked or escaped, every way out of an orderparam mode funnels through
+-- resetOrderParamMode, and it is the only signal that the map is finished with us. Vanilla ends a
+-- pick by redrawing the info panel it was started from; ours has to put the dialog back.
+local function hookResetOrderParamMode(menu)
+  if type(menu) ~= "table" or type(menu.resetOrderParamMode) ~= "function" then
+    debugTrace("hookResetOrderParamMode: no usable map menu")
+    return
+  end
+  if menu.standingOrdersResetOrderParamMode ~= nil then
+    return
+  end
+  menu.standingOrdersResetOrderParamMode = menu.resetOrderParamMode
+  menu.resetOrderParamMode = function (...)
+    local waspicking = StandingOrders.picking ~= nil
+    local result = menu.standingOrdersResetOrderParamMode(...)
+    if waspicking then
+      StandingOrders.picking = nil
+      StandingOrders.refreshCloneDialog()
+    end
+    return result
   end
 end
 
@@ -1625,6 +1776,7 @@ function StandingOrders.Init()
   debugTrace("MapMenu is " .. tostring(StandingOrders.mapMenu))
   hookCloseContextMenu(StandingOrders.mapMenu)
   hookCleanup(StandingOrders.mapMenu)
+  hookResetOrderParamMode(StandingOrders.mapMenu)
   StandingOrders.loopOrdersSkillLimit = C.GetOrderLoopSkillLimit() * 3
 end
 
