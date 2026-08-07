@@ -118,6 +118,7 @@ You can compare it with example of the source ship's Repeat Orders shown at the 
   - The unfinished **Add Location** button in the confirmation dialog, which could leave the map menu in a broken state
 
 - Fixed
+  - The mouse no longer stops working on the map after closing one of the mod's dialogs - previously it stayed dead until you moved the cursor over a side bar element
   - The source ship could end up in its own target list when it was part of the current map selection, which wiped its order queue instead of copying it - the source is now always excluded from the targets
   - A source ship that was sold, destroyed, captured or wrecked is no longer kept selected - the context menu offers **Select as Source** again instead of a **Clone from** entry with an empty ship name
   - Cloning is aborted with a warning if the source ship stops being a valid source while the confirmation dialog is open, and target ships that became invalid in the meantime are skipped

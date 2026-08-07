@@ -857,6 +857,38 @@ function StandingOrders.ProcessRequest(_, _)
   end
 end
 
+local ownContextModes = {
+  standing_orders_alert = true,
+  standing_orders_clone_confirm = true,
+}
+
+-- onTableMouseOver clears menu.picking; onTableMouseOut only restores it if the cursor leaves the
+-- same table, which never happens when our frame is destroyed under it. Ego repairs that in
+-- closeContextMenu, but only for a hardcoded list of its own contextMenuModes. Wrap the one
+-- funnel all close routes share -- our buttons, the frame's X, and closeOnUnhandledClick.
+local function hookCloseContextMenu(menu)
+  if type(menu) ~= "table" or type(menu.closeContextMenu) ~= "function" then
+    debugTrace("hookCloseContextMenu: no usable map menu")
+    return
+  end
+  -- Kept on the menu itself, which outlives a reload of this module, so the wrapper cannot stack.
+  if menu.standingOrdersCloseContextMenu ~= nil then
+    return
+  end
+  menu.standingOrdersCloseContextMenu = menu.closeContextMenu
+  menu.closeContextMenu = function (dueToClose, keepmenu)
+    local wasOwn = ownContextModes[menu.contextMenuMode] == true
+    local result = menu.standingOrdersCloseContextMenu(dueToClose, keepmenu)
+    if wasOwn then
+      if menu.holomap and (menu.holomap ~= 0) then
+        menu.picking = true
+      end
+      menu.currentMouseOverTable = nil
+    end
+    return result
+  end
+end
+
 function StandingOrders.Init()
   getPlayerId()
   ---@diagnostic disable-next-line: undefined-global
@@ -864,6 +896,7 @@ function StandingOrders.Init()
   AddUITriggeredEvent("StandingOrders", "Reloaded")
   StandingOrders.mapMenu = Lib.Get_Egosoft_Menu("MapMenu")
   debugTrace("MapMenu is " .. tostring(StandingOrders.mapMenu))
+  hookCloseContextMenu(StandingOrders.mapMenu)
   StandingOrders.loopOrdersSkillLimit = C.GetOrderLoopSkillLimit() * 3
 end
 
