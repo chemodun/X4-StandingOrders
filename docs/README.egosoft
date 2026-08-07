@@ -103,6 +103,18 @@ You can compare it with example of the source ship's Repeat Orders shown at the 
 [/list]
 [size=130][u]Changelog[/u][/size]
 
+[size=125][u][1.01] - 2026-08-??[/u][/size]
+[list]
+[*] Fixed
+[list]
+[*] A source ship that was sold, destroyed, captured or wrecked is no longer kept selected - the context menu offers [b]Select as Source[/b] again instead of a [b]Clone from[/b] entry with an empty ship name
+[*] Cloning is aborted with a warning if the source ship stops being a valid source while the confirmation dialog is open, and target ships that became invalid in the meantime are skipped
+[/list]
+[*] Changed
+[list]
+[*] [b]Deselect as Source[/b] is now available from any player-owned ship, not only from the source ship itself
+[/list]
+[/list]
 [size=125][u][1.00] - 2025-10-30[/u][/size]
 [list]
 [*] Added
