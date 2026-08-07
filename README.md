@@ -84,9 +84,15 @@ To deselect the current source ship, right-click on it in the map view and choos
 
 After confirming the cloning operation, the selected target ships will receive the cloned Repeat Orders from the source ship.
 
+- Source ship will remain unchanged, unless you not checked the `Apply changes to source ship` option in the cloning dialog.
+
 ![Source Ship](docs/images/source_ship.png)
 
+- Target ships will receive the cloned Repeat Orders unchanged.
+
 ![Cloned Ship Without Changes](docs/images/cloned_ship_without_changes.png)
+
+- Or, if you edited the orders in the cloning dialog, the target ships will receive the edited Repeat Orders.
 
 ![Cloned Ship With Another Capacity and Edited Order](docs/images/cloned_ship_with_another_capacity_and_edited_order.png)
 
