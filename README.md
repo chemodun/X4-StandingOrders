@@ -1,12 +1,13 @@
 # Standing Orders
 
-Standing Orders adds a lightweight interface that lets you clone Repeat Orders trade queues from one of player's ship to any number of other player-owned ships.
+Standing Orders adds a lightweight interface that lets you clone a Repeat Orders queue from one of player's ship to any number of other player-owned ships.
 
 ## Features
 
-- Clone a ship’s running Repeat Orders (currently Single Buy/Sell) onto any selection of eligible targets in a single confirmation step.
-- Works only with `Container` type of cargo.
-- Automatically scales cargo amounts to each target’s hold size while preserving wares, prices, and destinations.
+- Clone a ship’s running Repeat Orders onto any selection of eligible targets in a single confirmation step.
+- Works with **any** order that can be placed under Repeat Orders, not just trade orders - every parameter of every order is copied.
+- Automatically scales cargo amounts to each target’s hold size, matching the transport type the order actually uses.
+- Target ships only need cargo capacity when the source queue actually trades wares, so queues of non-trade orders can be cloned to any capable ship.
 
 ## Requirements
 
@@ -102,6 +103,18 @@ You can compare it with example of the source ship's Repeat Orders shown at the 
 ## Changelog
 
 ### [1.01] - 2026-08-??
+
+- Added
+  - Any order that can run under Repeat Orders can now be cloned, not only Single Buy and Single Sell - all parameters of every order are copied, including radii, positions, price thresholds and object lists
+  - The confirmation dialog now lists every order with all of its parameters, so you can see exactly what will be copied
+
+- Changed
+  - Cargo amounts are scaled using the transport type the order actually uses, instead of always assuming container cargo
+  - Target ships are only required to have cargo capacity when the source queue actually trades wares
+  - The target pilot skill requirement now matches the game's own Repeat Orders skill gate - some pilots that were previously accepted will now be rejected
+
+- Removed
+  - The unfinished **Add Location** button in the confirmation dialog, which could leave the map menu in a broken state
 
 - Fixed
   - A source ship that was sold, destroyed, captured or wrecked is no longer kept selected - the context menu offers **Select as Source** again instead of a **Clone from** entry with an empty ship name

@@ -55,10 +55,8 @@ local StandingOrders = {
   args = {},
   playerId = 0,
   mapMenu = {},
-  validOrders = {
-    SingleBuy  = "",
-    SingleSell = "",
-  },
+  orderDefs = {},
+  loopOrdersSkillLimit = 0,
   sourceId = 0,
   targetIds = {},
 }
@@ -126,6 +124,41 @@ local function getShipName(shipId)
   local idCodePtr = C.GetObjectIDCode(shipId)
   local idCode = (idCodePtr ~= nil) and ffi.string(idCodePtr) or ""
   return string.format("%s (%s)", name, idCode)
+end
+
+-- Resolved lazily: any order the engine knows, not a curated whitelist.
+local function getOrderDef(orderDef)
+  local cached = StandingOrders.orderDefs[orderDef]
+  if cached == nil then
+    cached = { name = orderDef, icon = "" }
+    local buf = ffi.new("OrderDefinition")
+    if C.GetOrderDefinition(buf, orderDef) then
+      cached.name = ffi.string(buf.name)
+      cached.icon = ffi.string(buf.icon)
+    else
+      debugTrace("order definition " .. tostring(orderDef) .. " could not be resolved")
+    end
+    StandingOrders.orderDefs[orderDef] = cached
+  end
+  return cached
+end
+
+local function findWareTransportType(orderParams)
+  for i = 1, #orderParams do
+    local p = orderParams[i]
+    if p.type == "ware" and p.value ~= nil then
+      return GetWareData(p.value, "transport")
+    end
+  end
+  return nil
+end
+
+-- True when a numeric param's own bound equals the ship's capacity for the order's ware -- i.e.
+-- it is a cargo-amount param, not an order-fixed bound like radius.
+local function isCargoBoundParam(paramData, sourceCapacity)
+  return paramData.type == "number" and sourceCapacity ~= nil
+      and paramData.inputparams ~= nil and paramData.inputparams.max ~= nil
+      and math.abs(paramData.inputparams.max - sourceCapacity) <= 0.01
 end
 
 local function centerFrameVertically(frame)
@@ -202,7 +235,9 @@ function StandingOrders.getStandingOrders(shipId)
   return orders
 end
 
-function StandingOrders.checkShip(shipId)
+-- transportTypes is only supplied when the source queue actually carries wares; a queue of
+-- non-trade orders imposes no cargo requirement on its targets.
+function StandingOrders.checkShip(shipId, transportTypes)
   local shipId = toUniverseId(shipId)
   if shipId == 0 or not IsValidComponent(shipId) then
     return false, { info = "InvalidShipID" }
@@ -218,26 +253,46 @@ function StandingOrders.checkShip(shipId)
   if not C.IsComponentOperational(shipId) or C.IsComponentWrecked(shipId) then
     return false, { info = "ShipNotOperational" }
   end
-  if StandingOrders.getCargoCapacity(shipId) == 0 then
-    return false, { info = "NoCargoCapacity" }
+  if type(transportTypes) == "table" then
+    for i = 1, #transportTypes do
+      if StandingOrders.getCargoCapacity(shipId, transportTypes[i]) == 0 then
+        return false, { info = "NoCargoCapacity", detail = "transport=" .. tostring(transportTypes[i]) }
+      end
+    end
   end
   return true
 end
 
-function StandingOrders.getCargoCapacity(shipId)
+function StandingOrders.getCargoCapacity(shipId, transportType)
   local menu = StandingOrders.mapMenu
   local shipId = toUniverseId(shipId)
+  if transportType == nil then
+    return 0
+  end
   local numStorages = C.GetNumCargoTransportTypes(shipId, true)
   local buf = ffi.new("StorageInfo[?]", numStorages)
   local count = C.GetCargoTransportTypes(buf, numStorages, shipId, true, false)
   local capacity = 0
   for i = 0, count - 1 do
     local tags = menu.getTransportTagsFromString(ffi.string(buf[i].transport))
-    if tags.container == true then
+    if tags[transportType] == true then
       capacity = capacity + buf[i].capacity
     end
   end
   return capacity
+end
+
+function StandingOrders.collectSourceTransportTypes(sourceId, orders)
+  local seen = {}
+  local list = {}
+  for i = 1, #orders do
+    local transportType = findWareTransportType(GetOrderParams(sourceId, orders[i].idx))
+    if transportType ~= nil and seen[transportType] == nil then
+      seen[transportType] = true
+      list[#list + 1] = transportType
+    end
+  end
+  return list
 end
 
 
@@ -254,23 +309,18 @@ function StandingOrders.isValidSourceShip()
   if #orders == 0 then
     return false, { info = "NoStandingOrders" }
   end
-  for _, order in ipairs(orders) do
-    if StandingOrders.validOrders[order.order] == nil then
-      return false, { info = "InvalidStandingOrder", detail = "order=" .. tostring(order.order) }
-    end
-  end
   return true
 end
 
-function StandingOrders.isValidTargetShip(target)
+function StandingOrders.isValidTargetShip(target, transportTypes)
   local targetId = toUniverseId(target)
-  local valid, errorData = StandingOrders.checkShip(targetId)
+  local valid, errorData = StandingOrders.checkShip(targetId, transportTypes)
   if not valid then
     return false, errorData
   end
-  local loopSkill = C.GetOrderLoopSkillLimit() * 3;
+  local loopSkill = StandingOrders.loopOrdersSkillLimit
   local aiPilot = GetComponentData(ConvertStringToLuaID(tostring(targetId)), "assignedaipilot")
-	local aiPilotSkill = aiPilot and math.floor(C.GetEntityCombinedSkill(ConvertIDTo64Bit(aiPilot), nil, "aipilot")) or -1
+  local aiPilotSkill = aiPilot and math.floor(C.GetEntityCombinedSkill(ConvertIDTo64Bit(aiPilot), nil, "aipilot") * 15 / 100) or -1
   if aiPilotSkill < loopSkill then
     return false, { info = "TargetPilotSkillTooLow", detail = "skill=" .. tostring(aiPilotSkill) .. ", required=" .. tostring(loopSkill) }
   end
@@ -349,8 +399,6 @@ function StandingOrders.showSourceAlert(errorData)
       details = ReadText(1972092408, 10131)
     elseif errorData.info == "NoStandingOrders" then
       details = ReadText(1972092408, 10132)
-    elseif errorData.info == "InvalidStandingOrder" then
-      details = ReadText(1972092408, 10133)
     end
   end
   local message = string.format(ReadText(1972092408, 10111), sourceName, details)
@@ -455,6 +503,68 @@ function StandingOrders.showTargetAlert()
 end
 
 
+-- Formatting is delegated to the map menu's own getParamValue, which already covers every
+-- param type the engine emits. Objects it names can vanish mid-dialog, hence the pcall.
+local function formatParamValue(param, sourceCapacity)
+  local menu = StandingOrders.mapMenu
+  local function format(valueType, value)
+    local ok, result = pcall(menu.getParamValue, valueType, value, param.inputparams)
+    if not ok or result == nil then
+      return tostring(value)
+    end
+    local flattened = tostring(result):gsub("\n", " / ")
+    return flattened
+  end
+
+  if param.type == "list" then
+    local innerType = param.inputparams and param.inputparams.type
+    local items = {}
+    for i = 1, #(param.value or {}) do
+      items[#items + 1] = format(innerType, param.value[i])
+    end
+    if #items == 0 then
+      return "-"
+    end
+    return table.concat(items, ", ")
+  end
+
+  local text = format(param.type, param.value)
+  if isCargoBoundParam(param, sourceCapacity) and sourceCapacity > 0 then
+    text = string.format("%s (%.2f%%)", text, param.value * 100 / sourceCapacity)
+  end
+  return text
+end
+
+-- Flattens the queue into renderable lines: a header per order, then one row per settable param.
+function StandingOrders.buildPreviewLines(sourceId)
+  local lines = {}
+  local orders = StandingOrders.getStandingOrders(sourceId)
+  for i = 1, #orders do
+    local order = orders[i]
+    local def = getOrderDef(order.order)
+    local header = def.name
+    if def.icon ~= "" then
+      header = "\27[" .. def.icon .. "] " .. header
+    end
+    lines[#lines + 1] = { kind = "order", text = header }
+
+    local orderParams = GetOrderParams(sourceId, order.idx) or {}
+    local transportType = findWareTransportType(orderParams)
+    local sourceCapacity = transportType and StandingOrders.getCargoCapacity(sourceId, transportType) or nil
+    for paramIdx = 1, #orderParams do
+      local param = orderParams[paramIdx]
+      if param.type ~= "internal" and param.value ~= nil then
+        local label = param.text
+        if label == nil or label == "" then
+          label = tostring(param.name)
+        end
+        lines[#lines + 1] = { kind = "param", label = label, value = formatParamValue(param, sourceCapacity) }
+      end
+    end
+  end
+  return lines
+end
+
 function StandingOrders.cloneOrdersPrepare()
   local valid, errorData = StandingOrders.isValidSourceShip()
   if not valid then
@@ -463,11 +573,13 @@ function StandingOrders.cloneOrdersPrepare()
   end
   local args = StandingOrders.args or {}
   StandingOrders.sourceId = toUniverseId(args.source)
+  local sourceOrders = StandingOrders.getStandingOrders(StandingOrders.sourceId)
+  local transportTypes = StandingOrders.collectSourceTransportTypes(StandingOrders.sourceId, sourceOrders)
   local targets = args.targets or {}
   local targetIds = {}
   for i = 1, #targets do
     local targetId = toUniverseId(targets[i])
-    local valid, errorData = StandingOrders.isValidTargetShip(targetId)
+    local valid, errorData = StandingOrders.isValidTargetShip(targetId, transportTypes)
     if valid then
       targetIds[#targetIds + 1] = targetId
     end
@@ -545,50 +657,23 @@ function StandingOrders.cloneOrdersConfirm()
   headerRow[1]:setColSpan(8):createText(ReadText(1001, 3225), Helper.headerRowCenteredProperties) -- Order Queue
 
   local tableHeaderRow = ftable:addRow(false, { fixed = true })
-  tableHeaderRow[1]:createText(ReadText(1001, 7802), Helper.headerRow1Properties) -- Orders
-  tableHeaderRow[2]:setColSpan(2):createText(ReadText(1001, 45), Helper.headerRow1Properties) -- Ware
-  tableHeaderRow[4]:createText(ReadText(1001, 1202), Helper.headerRow1Properties) -- Amount
-  tableHeaderRow[5]:createText(ReadText(1001, 2808), Helper.headerRow1Properties) -- Price
-  tableHeaderRow[6]:setColSpan(3):createText(ReadText(1041, 10049), Helper.headerRow1Properties) -- Location
+  tableHeaderRow[1]:setColSpan(8):createText(ReadText(1001, 7802), Helper.headerRow1Properties) -- Orders
   tableHeaderRow[9]:setColSpan(5):createText(ReadText(1001, 2809), Helper.headerRow1Properties) -- Name
 
   ftable:addEmptyRow(Helper.standardTextHeight / 2)
 
-  local orders = StandingOrders.getStandingOrders(sourceId)
-  local cargoCapacity = StandingOrders.getCargoCapacity(sourceId)
-  local lineCount = math.max(#orders, #targetIds)
-  local instance = "left"
-  menu.infoTableData[instance] = {}
-  menu.infoTableData[instance].orders = {}
+  local lines = StandingOrders.buildPreviewLines(sourceId)
+  local lineCount = math.max(#lines, #targetIds)
   for i = 1, lineCount do
     local row = ftable:addRow(false)
-    if i <= #orders then
-      local order = orders[i]
-      menu.infoTableData[instance].orders[i] = {}
-      local orderparams = GetOrderParams(sourceId, order.idx)
-      menu.infoTableData[instance].orders[i].params = orderparams
-      row[1]:createText(StandingOrders.validOrders[order.order], {halign = "left"})
-      row[2]:setColSpan(2):createText(GetWareData(orderparams[1].value, "name"), {halign = "left"})
-      local amount = orderparams[5].value
-      if order.order == "SingleSell" then
-        amount = cargoCapacity - amount
-      end
-      local percentage = (cargoCapacity > 0) and (amount * 100 / cargoCapacity ) or 0
-      row[4]:createText(string.format("%.2f%%", percentage), {halign = "right"})
-      row[5]:createText(orderparams[7].value, {halign = "right"})
-      local locations = orderparams[4].value
-      if type(locations) == "table" and #locations >= 1 then
-        local locId = toUniverseId(locations[1])
-        local locName = GetComponentData(ConvertStringToLuaID(tostring(locId)), "name")
-        if (#locations > 1) then
-          locName = locName .. ", ..."
-        end
-        row[6]:setColSpan(3):createText(locName )
-      else
-        row[6]:setColSpan(3):createText("-", {halign = "center"})
-      end
-    else
+    local line = lines[i]
+    if line == nil then
       row[1]:setColSpan(8):createText("", {halign = "left"})
+    elseif line.kind == "order" then
+      row[1]:setColSpan(8):createText(line.text, copyAndEnrichTable(Helper.headerRow1Properties, {color = Color["text_player_current"]}))
+    else
+      row[1]:setColSpan(3):createText("  " .. line.label .. ReadText(1001, 120), {halign = "left"})
+      row[4]:setColSpan(5):createText(line.value, {halign = "left"})
     end
     if i <= #targetIds then
       local targetName = getShipName(targetIds[i])
@@ -619,122 +704,11 @@ function StandingOrders.cloneOrdersConfirm()
     StandingOrders.clearSource()
     menu.closeContextMenu("back")
   end
-
-  buttonRow[4]:setColSpan(2):createButton():setText('Add Location', { halign = "center" })
-  buttonRow[4].handlers.onClick = function ()
-    return StandingOrders.SetOrderParam(1, 4, 1, nil, instance)
-  end
   ftable:setSelectedCol(12)
 
   centerFrameVertically(frame)
 
   frame:display()
-end
-
-function StandingOrders.setOrderParamFromMode(orderIdx, paramIdx, subIdx, value, instance)
-  debugTrace("setOrderParamFromMode called for orderIdx " .. tostring(orderIdx) .. ", paramIdx " .. tostring(paramIdx) .. ", subIdx " .. tostring(subIdx) .. ", value " .. tostring(value) .. ", instance " .. tostring(instance))
-  local menu = StandingOrders.mapMenu
-  menu.resetOrderParamMode()
-  StandingOrders.cloneOrdersConfirm()
-end
-
-function StandingOrders.SetOrderParam(orderIdx, paramIdx, subIdx, value, instance)
-  local menu = StandingOrders.mapMenu
-  local paramdata = menu.infoTableData[instance].orders[orderIdx].params[paramIdx]
-  local paramtype, oldvalue
-  if paramdata.type == "list" then
-    paramtype = paramdata.inputparams.type
-    if not paramtype then
-      DebugError("Order parameter of type 'list' does not specify a input parameter 'type' [Florian]")
-    end
-    if subIdx then
-      oldvalue = paramdata.value[subIdx]
-    end
-  else
-    paramtype = paramdata.type
-    oldvalue = paramdata.value
-  end
-  if paramtype == "object" then
-    menu.currentInfoMode = { menu.infoTableMode, menu.infoMode.left }
-    menu.infoTableMode = "objectlist"
-    menu.mode = "orderparam_object"
-    local controllable = ConvertStringToLuaID(tostring(StandingOrders.sourceId))
-    local toprow = 1
-    if instance == "left" then
-      toprow = GetTopRow(menu.infoTable)
-    elseif instance == "right" then
-      toprow = GetTopRow(menu.infoTableRight)
-    end
-    menu.modeparam = { function (value) return StandingOrders.setOrderParamFromMode(orderIdx, paramIdx, subIdx, value, instance) end, paramdata, toprow, controllable, orderIdx, paramIdx }
-
-    C.SetMapOrderParamObjectFilter(menu.holomap, ConvertStringTo64Bit(tostring(menu.modeparam[4])), menu.modeparam[5], menu.modeparam[6])
-
-    menu.settoprow = 0
-
-    menu.closeContextMenu()
-    menu.refreshInfoFrame()
-    menu.refreshMainFrame = true
-  elseif paramtype == "ware" then
-    --[[ if value then
-      local object64 = ConvertStringTo64Bit(tostring(menu.infoSubmenuObject))
-      if (paramdata.type == "list") and (type(value) == "table") then
-        local skip = true
-
-        local sorted = {}
-        for ware in pairs(value) do
-          table.insert(sorted, ware)
-        end
-        -- we want to re-add the complete list to keep it alphabetical
-        if not paramdata.value then
-          -- no values yet, we need to set
-          skip = false
-        else
-          if #paramdata.value ~= #sorted then
-            -- number is not the same, we need to set
-            skip = false
-          else
-            for _, ware in ipairs(paramdata.value) do
-              if not value[ware] then
-                -- exisiting value not in new list, we need to set
-                skip = false
-                break
-              end
-            end
-            -- if skip is still true here, all existing values are in the new list and previous check excludes the case of only new entries added, nothing to do
-          end
-          if not skip then
-            -- remove all old
-            for listidx = #paramdata.value, 1, -1 do
-              RemoveOrderListParam(object64, order, param, listidx)
-            end
-          end
-        end
-        if not skip then
-          -- add all new
-          table.sort(sorted, Helper.sortWareName)
-          for _, ware in ipairs(sorted) do
-            SetOrderParam(object64, order, param, nil, ware)
-          end
-        end
-      else
-        SetOrderParam(object64, order, param, index, value)
-        AddUITriggeredEvent(menu.name, "orderparam_" .. paramdata.name, value)
-      end
-      menu.closeContextMenu()
-      Helper.clearTableConnectionColumn(menu, 3)
-      menu.refreshInfoFrame()
-    else
-      menu.contextMenuMode = "set_orderparam_ware"
-      menu.contextMenuData = { order = order, param = param, index = index, instance = instance }
-      local offsetx = menu.infoTableOffsetX + menu.infoTableWidth + config.contextBorder
-      if instance == "right" then
-        offsetx = Helper.viewWidth - offsetx - config.orderqueueContextWidth
-      end
-      menu.createContextFrame(config.orderqueueContextWidth, Helper.viewHeight - menu.infoTableOffsetY, offsetx, menu.infoTableOffsetY)
-    end ]]
-  else
-    debugTrace("SetOrderParam: unsupported parameter type " .. tostring(paramtype))
-  end
 end
 
 function StandingOrders.cloneOrdersExecute()
@@ -746,15 +720,16 @@ function StandingOrders.cloneOrdersExecute()
     StandingOrders.reportError(errorData)
     return false, errorData
   end
-  debugTrace("Executing clone orders from source " .. getShipName(StandingOrders.sourceId) .. " to " .. tostring(#StandingOrders.targetIds) .. " targets")
-  local sourceOrders = StandingOrders.getStandingOrders(StandingOrders.sourceId)
+  local sourceId = StandingOrders.sourceId
+  debugTrace("Executing clone orders from source " .. getShipName(sourceId) .. " to " .. tostring(#StandingOrders.targetIds) .. " targets")
+  local sourceOrders = StandingOrders.getStandingOrders(sourceId)
   local targets = StandingOrders.targetIds
-  local cargoCapacity = StandingOrders.getCargoCapacity(StandingOrders.sourceId)
+  local transportTypes = StandingOrders.collectSourceTransportTypes(sourceId, sourceOrders)
   local processedOrders = 0
   for i = 1, #targets do
     local targetId = targets[i]
     debugTrace("Cloning orders to target " .. getShipName(targetId))
-    if not StandingOrders.checkShip(targetId) then
+    if not StandingOrders.checkShip(targetId, transportTypes) then
       debugTrace("skipping target " .. getShipName(targetId) .. " - no longer valid")
     elseif not C.RemoveAllOrders(targetId) then
       debugTrace("failed to clear target order queue for " .. getShipName(targetId))
@@ -762,30 +737,42 @@ function StandingOrders.cloneOrdersExecute()
       C.CreateOrder(targetId, "Wait", true)
       C.EnablePlannedDefaultOrder(targetId, false)
       C.SetOrderLoop(targetId, 0, false)
-      local targetCargoCapacity = StandingOrders.getCargoCapacity(targetId)
       for j = 1, #sourceOrders do
         local order = sourceOrders[j]
-        if order.ware == nil then
-          local orderParams = GetOrderParams(StandingOrders.sourceId, order.idx)
-          order.ware = orderParams[1].value
-          order.amount = (cargoCapacity > 0) and (orderParams[5].value / cargoCapacity ) or 0
-          order.price = orderParams[7].value * 100
-          order.locations = orderParams[4].value
-        end
-        local newOrderIdx = C.CreateOrder(targetId, order.order, false)
-        if newOrderIdx and newOrderIdx > 0 then
-          SetOrderParam(targetId, newOrderIdx, 1, nil, order.ware)
-          SetOrderParam(targetId, newOrderIdx, 5, nil, math.floor(order.amount * targetCargoCapacity + 0.5))
-          SetOrderParam(targetId, newOrderIdx, 7, nil, order.price)
-          local locations = order.locations or {}
-          for j=1, #locations do
-            SetOrderParam(targetId, newOrderIdx, 4, nil, locations[j])
+        local orderParams = GetOrderParams(sourceId, order.idx) or {}
+        if #orderParams > 0 then
+          local transportType = findWareTransportType(orderParams)
+          local sourceCapacity = transportType and StandingOrders.getCargoCapacity(sourceId, transportType) or nil
+          local newOrderIdx = C.CreateOrder(targetId, order.order, false)
+          if newOrderIdx and newOrderIdx > 0 then
+            local targetCapacity = transportType and StandingOrders.getCargoCapacity(targetId, transportType) or nil
+            for paramIdx = 1, #orderParams do
+              local param = orderParams[paramIdx]
+              if param.type ~= "internal" then
+                if param.type == "list" then
+                  for l = 1, #(param.value or {}) do
+                    SetOrderParam(targetId, newOrderIdx, paramIdx, nil, param.value[l])
+                  end
+                else
+                  local value = param.value
+                  if param.type == "money" then
+                    -- GetOrderParams returns display scale, SetOrderParam expects x100
+                    value = value * 100
+                  elseif param.type == "position" then
+                    value = { ConvertStringToLuaID(tostring(value[1])), { value[2].x, value[2].y, value[2].z } }
+                  elseif isCargoBoundParam(param, sourceCapacity) then
+                    value = (sourceCapacity > 0) and math.floor(value / sourceCapacity * targetCapacity) or 0
+                  end
+                  SetOrderParam(targetId, newOrderIdx, paramIdx, nil, value)
+                end
+              end
+            end
+            debugTrace(" Created order " .. tostring(order.order) .. " on target " .. getShipName(targetId) .. " at index " .. tostring(newOrderIdx))
+            C.EnableOrder(targetId, newOrderIdx)
+            processedOrders = processedOrders + 1
+          else
+            debugTrace(" Failed to create order " .. tostring(order.order) .. " on target " .. getShipName(targetId))
           end
-          debugTrace(" Created order " .. tostring(order.order) .. " on target " .. getShipName(targetId) .. " at index " .. tostring(newOrderIdx))
-          C.EnableOrder(targetId, newOrderIdx)
-          processedOrders = processedOrders + 1
-        else
-          debugTrace(" Failed to create order " .. tostring(order.order) .. " on target " .. getShipName(targetId))
         end
       end
     end
@@ -850,20 +837,6 @@ function StandingOrders.ProcessRequest(_, _)
   end
 end
 
-function StandingOrders.OrderNamesCollect()
-  for orderDef, _ in pairs(StandingOrders.validOrders) do
-    local buf = ffi.new("OrderDefinition")
-    local found = C.GetOrderDefinition(buf, orderDef)
-    if found then
-      local orderName = ffi.string(buf.name)
-      StandingOrders.validOrders[orderDef] = orderName
-      debugTrace("Order definition " .. orderDef .. " resolved to name " .. StandingOrders.validOrders[orderDef])
-    else
-      debugTrace("Order definition " .. orderDef .. " could not be resolved")
-    end
-  end
-end
-
 function StandingOrders.Init()
   getPlayerId()
   ---@diagnostic disable-next-line: undefined-global
@@ -871,7 +844,7 @@ function StandingOrders.Init()
   AddUITriggeredEvent("StandingOrders", "Reloaded")
   StandingOrders.mapMenu = Lib.Get_Egosoft_Menu("MapMenu")
   debugTrace("MapMenu is " .. tostring(StandingOrders.mapMenu))
-  StandingOrders.OrderNamesCollect()
+  StandingOrders.loopOrdersSkillLimit = C.GetOrderLoopSkillLimit() * 3
 end
 
 Register_Require_With_Init("extensions.standing_orders.ui.standing_orders", StandingOrders, StandingOrders.Init)
