@@ -35,6 +35,22 @@ ffi.cdef [[
 		uint32_t requiredSkill;
 	} OrderDefinition;
 
+	typedef struct {
+		const char* ware;
+		int32_t current;
+		int32_t max;
+	} WareYield;
+
+	typedef struct {
+		const char* shape;
+		const char* name;
+		uint32_t requiredSkill;
+		float radius;
+		bool rollMembers;
+		bool rollFormation;
+		size_t maxShipsPerLine;
+	} UIFormationInfo;
+
 	UniverseID GetPlayerID(void);
 	bool IsGamePaused(void);
 
@@ -51,6 +67,10 @@ ffi.cdef [[
 	bool EnablePlannedDefaultOrder(UniverseID controllableid, bool checkonly);
 	bool SetOrderLoop(UniverseID controllableid, size_t orderidx, bool checkonly);
 	bool EnableOrder(UniverseID controllableid, size_t idx);
+	uint32_t GetNumDiscoveredSectorResources(UniverseID sectorid);
+	uint32_t GetDiscoveredSectorResources(WareYield* result, uint32_t resultlen, UniverseID sectorid);
+	uint32_t GetNumFormationShapes(void);
+	uint32_t GetFormationShapes(UIFormationInfo* result, uint32_t resultlen);
 ]]
 
 local StandingOrders = {
@@ -73,6 +93,9 @@ local StandingOrders = {
   -- Ships whose queue the engine refuses to clear, keyed by tostring(id).
   blocked = {},
   sourceBlocked = false,
+  -- Set while a value picker replaces the dialog; nil means the dialog itself is showing.
+  ---@type table?
+  picker = nil,
 }
 
 -- Param types the dialog can edit in place. The rest render as vanilla does but stay inactive.
@@ -83,6 +106,22 @@ local inlineEditableTypes = {
   time = true,
   money = true,
 }
+
+-- Param types a picker frame can supply a value for, either directly or as a list element type.
+local pickableTypes = {
+  ware = true,
+  sector = true,
+  formationshape = true,
+}
+
+-- Picker frame titles, taken from the vanilla contexts these are ports of.
+local pickerTitles = {
+  ware = { single = 8306, list = 8376 },
+  sector = { single = 11238, list = 9177 },
+  formationshape = { single = 8307, list = 8307 },
+}
+
+local pickerWidth = 350
 
 
 local Lib = require("extensions.sn_mod_support_apis.ui.Library")
@@ -576,7 +615,6 @@ function StandingOrders.buildStagedQueue(sourceId)
   for i = 1, #orders do
     local order = orders[i]
     local params = GetOrderParams(sourceId, order.idx) or {}
-    local transportType = findWareTransportType(params)
     local hasParams = false
     for j = 1, #params do
       if params[j].type ~= "internal" then
@@ -591,11 +629,19 @@ function StandingOrders.buildStagedQueue(sourceId)
       params = params,
       hasParams = hasParams,
       expanded = true,
-      transportType = transportType,
-      sourceCapacity = transportType and StandingOrders.getCargoCapacity(sourceId, transportType) or nil,
     }
   end
   return staged
+end
+
+-- Both derive from the staged ware params, which a picker can change, so they are recomputed
+-- whenever the dialog is rebuilt or the queue applied rather than cached from the snapshot.
+function StandingOrders.refreshStagedCapacities()
+  for i = 1, #StandingOrders.staged do
+    local entry = StandingOrders.staged[i]
+    entry.transportType = findWareTransportType(entry.params)
+    entry.sourceCapacity = entry.transportType and StandingOrders.getCargoCapacity(StandingOrders.sourceId, entry.transportType) or nil
+  end
 end
 
 function StandingOrders.stagedTransportTypes()
@@ -613,7 +659,8 @@ end
 
 -- Rebuilding the frame from inside a widget callback fights closeOnUnhandledClick and the pending
 -- frame teardown, so every mutation defers the rebuild by one update, as ego does for its own
--- context refreshes.
+-- context refreshes. The same deferral swaps between the dialog and a value picker, since the map
+-- menu only ever holds one context frame.
 function StandingOrders.refreshCloneDialog()
   local queueTable = StandingOrders.queueTable
   if queueTable and queueTable.id then
@@ -629,8 +676,16 @@ function StandingOrders.refreshCloneDialog()
       -- The rebuild tears the old frame down and puts an identical one up; that is not the dialog
       -- going away, so the pause must survive it.
       StandingOrders.rebuilding = true
-      StandingOrders.cloneOrdersConfirm()
+      if StandingOrders.picker then
+        StandingOrders.showParamPicker()
+      else
+        StandingOrders.cloneOrdersConfirm()
+      end
       StandingOrders.rebuilding = false
+    else
+      -- Nothing left to show: the pause would otherwise have no owner to release it.
+      StandingOrders.picker = nil
+      StandingOrders.releasePause()
     end
   end, false, 0)
 end
@@ -659,6 +714,104 @@ function StandingOrders.checkboxStagedParam(param)
   param.value = (param.value ~= 0) and 0 or 1
 end
 
+-- The element type of a list param, or the param's own type otherwise -- what a picker must supply.
+local function pickerKind(param)
+  if param.type == "list" then
+    return param.inputparams and param.inputparams.type
+  end
+  return param.type
+end
+
+local function isPickable(param)
+  return (pickableTypes[pickerKind(param)] == true) and not isParamLocked(param)
+end
+
+-- Sector values travel as Lua IDs; the selection map is keyed by the 64-bit form so a value read
+-- back from GetOrderParams and one built here compare equal.
+local function pickerKey(kind, value)
+  if kind == "sector" then
+    return tostring(ConvertIDTo64Bit(value))
+  end
+  return tostring(value)
+end
+
+function StandingOrders.buttonOpenPicker(param)
+  StandingOrders.picker = { param = param, kind = pickerKind(param), islist = param.type == "list" }
+  StandingOrders.refreshCloneDialog()
+end
+
+function StandingOrders.buttonClosePicker()
+  StandingOrders.picker = nil
+  StandingOrders.refreshCloneDialog()
+end
+
+function StandingOrders.buttonRemoveStagedListParam(param, listIdx)
+  table.remove(param.value, listIdx)
+  StandingOrders.refreshCloneDialog()
+end
+
+function StandingOrders.buttonPickerSetValue(value)
+  local picker = StandingOrders.picker
+  if picker then
+    picker.param.value = value
+  end
+  StandingOrders.buttonClosePicker()
+end
+
+-- Ego re-adds a whole list rather than patching it, to keep it alphabetical; the staged list is
+-- rebuilt the same way, in the option order the picker already sorted.
+function StandingOrders.buttonPickerSetList()
+  local picker = StandingOrders.picker
+  if picker then
+    local values = {}
+    for i = 1, #picker.options do
+      local option = picker.options[i]
+      if picker.selected[option.key] then
+        values[#values + 1] = option.value
+      end
+    end
+    picker.param.value = values
+  end
+  StandingOrders.buttonClosePicker()
+end
+
+function StandingOrders.checkboxPickerOption(key, checked)
+  StandingOrders.picker.selected[key] = checked or nil
+end
+
+function StandingOrders.checkboxPickerToggleAll(checked)
+  local picker = StandingOrders.picker
+  picker.selected = {}
+  if checked then
+    for i = 1, #picker.options do
+      picker.selected[picker.options[i].key] = true
+    end
+  end
+end
+
+function StandingOrders.pickerNumSelected()
+  local count = 0
+  for _ in pairs(StandingOrders.picker.selected) do
+    count = count + 1
+  end
+  return count
+end
+
+function StandingOrders.isPickerSelectionChanged()
+  local picker = StandingOrders.picker
+  for key in pairs(picker.selected) do
+    if not picker.origSelected[key] then
+      return true
+    end
+  end
+  for key in pairs(picker.origSelected) do
+    if not picker.selected[key] then
+      return true
+    end
+  end
+  return false
+end
+
 -- Sliders show length in km and time in minutes; the staged value stays in the scale
 -- GetOrderParams returned, which is what cloneOrdersExecute expects. Money is the exception:
 -- both are in display scale and the x100 happens on apply.
@@ -677,8 +830,10 @@ function StandingOrders.slidercellStagedParam(param, value)
 end
 
 -- Port of menu.displayOrderParam (menu_map.lua:10142) in its hasloop layout: same widgets, same
--- columns, but every handler writes into the staged param instead of a live order.
-function StandingOrders.addStagedParamRow(zipper, entry, param, listIdx)
+-- columns, but every handler writes into the staged param instead of a live order. listParam is the
+-- owning list param when this row renders one of its entries -- it, not the synthetic entry param,
+-- is what a picker edits.
+function StandingOrders.addStagedParamRow(zipper, entry, param, listIdx, listParam)
   local value = param.value
   local ismissing = value == nil
   local active = (not isParamLocked(param)) and (inlineEditableTypes[param.type] == true)
@@ -691,10 +846,13 @@ function StandingOrders.addStagedParamRow(zipper, entry, param, listIdx)
   local paramtext = (param.text ~= "") and ("  " .. param.text .. ReadText(1001, 120)) or ""
 
   if listIdx then
+    local pickable = isPickable(listParam)
     local row = zipper.add(true, {  })
     row[4]:createText(paramtext)
-    row[5]:setColSpan(7):createButton({ active = false }):setText(value and tostring(value) or "", { halign = "center", color = paramcolor })
-    row[12]:createButton({ active = false }):setText("x", { halign = "center", color = paramcolor })
+    row[5]:setColSpan(7):createButton({ active = pickable }):setText(value and tostring(value) or "", { halign = "center", color = paramcolor })
+    row[5].handlers.onClick = function () return StandingOrders.buttonOpenPicker(listParam) end
+    row[12]:createButton({ active = pickable and ((not listParam.required) or (#listParam.value > 1)) }):setText("x", { halign = "center", color = paramcolor })
+    row[12].handlers.onClick = function () return StandingOrders.buttonRemoveStagedListParam(listParam, listIdx) end
   elseif param.inputparams and (param.type == "number" or param.type == "length" or param.type == "time" or param.type == "money") then
     local defaultmax = 50000
     local minselect = math.max(0, param.inputparams.min or 0)
@@ -772,12 +930,14 @@ function StandingOrders.addStagedParamRow(zipper, entry, param, listIdx)
     row[5]:createCheckBox(function () return param.value ~= nil and param.value ~= 0 end, { active = active, width = Helper.standardTextHeight })
     row[5].handlers.onClick = function () return StandingOrders.checkboxStagedParam(param) end
   else
+    local pickable = isPickable(param)
     local row = zipper.add(true, {  })
     row[4]:createText(paramtext)
     row[5]:setColSpan(8)
     local text = value and tostring(value) or (ColorText["text_inactive"] .. ReadText(1001, 3102) .. "...")
     local height = math.max(Helper.standardTextHeight, math.ceil(C.GetTextHeight(text, Helper.standardFont, Helper.standardFontSize, row[5]:getWidth())) + Helper.borderSize)
-    row[5]:createButton({ active = false, height = height }):setText(text, { halign = "center", color = paramcolor, y = (height - Helper.standardTextHeight) / 2 })
+    row[5]:createButton({ active = pickable, height = height }):setText(text, { halign = "center", color = paramcolor, y = (height - Helper.standardTextHeight) / 2 })
+    row[5].handlers.onClick = function () return StandingOrders.buttonOpenPicker(param) end
   end
 end
 
@@ -804,20 +964,20 @@ function StandingOrders.addStagedOrderRows(zipper)
         local param = entry.params[j]
         if (not param.advanced) or StandingOrders.showAdvanced then
           if param.type == "list" then
-            if param.value then
-              for k = 1, #param.value do
-                local param2 = {
-                  text = (k == 1) and param.text or "",
-                  value = param.value[k],
-                  type = param.inputparams.type,
-                  editable = param.editable,
-                  playerreadonly = param.inputparams and param.inputparams.playerreadonly,
-                }
-                StandingOrders.addStagedParamRow(zipper, entry, param2, k)
-              end
+            param.value = param.value or {}
+            for k = 1, #param.value do
+              local param2 = {
+                text = (k == 1) and param.text or "",
+                value = param.value[k],
+                type = param.inputparams.type,
+                editable = param.editable,
+                playerreadonly = param.inputparams and param.inputparams.playerreadonly,
+              }
+              StandingOrders.addStagedParamRow(zipper, entry, param2, k, param)
             end
             local addRow = zipper.add(true, {  })
-            addRow[2]:setColSpan(11):createButton({ active = false }):setText("  " .. string.format(ReadText(1001, 3235), param.text), { halign = "center" })
+            addRow[2]:setColSpan(11):createButton({ active = isPickable(param) }):setText("  " .. string.format(ReadText(1001, 3235), param.text), { halign = "center" })
+            addRow[2].handlers.onClick = function () return StandingOrders.buttonOpenPicker(param) end
           elseif param.type ~= "internal" then
             StandingOrders.addStagedParamRow(zipper, entry, param, nil)
           end
@@ -825,6 +985,197 @@ function StandingOrders.addStagedOrderRows(zipper)
       end
     end
   end
+end
+
+-- Option lists mirror ego's own pickers: createOrderparamWareContext (menu_map.lua:20760),
+-- createOrderparamSectorContext (20863) and createOrderparamFormationShapeContext (21049). None of
+-- them reads a live order, only param.inputparams -- which is what makes staged editing possible.
+function StandingOrders.buildPickerOptions(kind, inputparams)
+  local options = {}
+  if kind == "ware" then
+    local wares = Helper.getOrderParameterWares(inputparams or {})
+    for i = 1, #wares do
+      options[i] = { key = wares[i], value = wares[i], name = GetWareData(wares[i], "name") }
+    end
+  elseif kind == "sector" then
+    local needed
+    if inputparams and inputparams.hasresources then
+      needed = {}
+      for _, ware in ipairs(inputparams.hasresources) do
+        needed[ware] = true
+      end
+    end
+    local sectorIds = {}
+    for _, cluster in ipairs(GetClusters(true)) do
+      for _, sector in ipairs(GetSectors(cluster)) do
+        local sector64 = ConvertIDTo64Bit(sector)
+        if needed == nil then
+          sectorIds[#sectorIds + 1] = sector64
+        else
+          local n = C.GetNumDiscoveredSectorResources(sector64)
+          local buf = ffi.new("WareYield[?]", n)
+          n = C.GetDiscoveredSectorResources(buf, n, sector64)
+          for i = 0, n - 1 do
+            if needed[ffi.string(buf[i].ware)] then
+              sectorIds[#sectorIds + 1] = sector64
+              break
+            end
+          end
+        end
+      end
+    end
+    table.sort(sectorIds, Helper.sortComponentName)
+    for i = 1, #sectorIds do
+      options[i] = {
+        key = tostring(sectorIds[i]),
+        value = ConvertStringToLuaID(tostring(sectorIds[i])),
+        name = GetComponentData(sectorIds[i], "name"),
+      }
+    end
+  elseif kind == "formationshape" then
+    local shapes = {}
+    local n = C.GetNumFormationShapes()
+    local buf = ffi.new("UIFormationInfo[?]", n)
+    n = C.GetFormationShapes(buf, n)
+    for i = 0, n - 1 do
+      shapes[#shapes + 1] = { shape = ffi.string(buf[i].shape), name = ffi.string(buf[i].name) }
+    end
+    table.sort(shapes, Helper.sortName)
+    for i = 1, #shapes do
+      options[i] = { key = shapes[i].shape, value = shapes[i].shape, name = shapes[i].name }
+    end
+  end
+  return options
+end
+
+-- Replaces the dialog frame for as long as a value is being picked; every close route leads back to
+-- the dialog, so the picker reads as a sub-frame of it even though the map holds only one.
+function StandingOrders.showParamPicker()
+  local menu = StandingOrders.mapMenu
+  local picker = StandingOrders.picker
+  if type(menu) ~= "table" or type(menu.closeContextMenu) ~= "function" or type(Helper) ~= "table" or picker == nil then
+    debugTrace("showParamPicker: map menu instance or picker state is not available")
+    return false
+  end
+
+  picker.options = StandingOrders.buildPickerOptions(picker.kind, picker.param.inputparams)
+  if picker.islist then
+    picker.selected = {}
+    picker.origSelected = {}
+    for _, value in ipairs(picker.param.value or {}) do
+      local key = pickerKey(picker.kind, value)
+      picker.selected[key] = true
+      picker.origSelected[key] = true
+    end
+  end
+
+  local width = Helper.scaleX(pickerWidth)
+  local xoffset = (Helper.viewWidth - width) / 2
+  local yoffset = Helper.viewHeight / 2
+
+  menu.closeContextMenu()
+  StandingOrders.queueTable = nil
+
+  menu.contextMenuMode = "standing_orders_param_picker"
+  menu.contextMenuData = {
+    mode = "standing_orders_param_picker",
+    width = width,
+    xoffset = xoffset,
+    yoffset = yoffset,
+  }
+
+  menu.contextFrame = Helper.createFrameHandle(menu, {
+    x = xoffset - 2 * Helper.borderSize,
+    y = yoffset,
+    width = width + 2 * Helper.borderSize,
+    layer = menu.contextFrameLayer or 2,
+    standardButtons = { close = true },
+    closeOnUnhandledClick = true,
+  })
+  local frame = menu.contextFrame
+  frame:setBackground("solid", { color = Color["frame_background_semitransparent"] })
+
+  local titles = pickerTitles[picker.kind]
+  local title = ReadText(1001, picker.islist and titles.list or titles.single)
+
+  local ftable = frame:addTable(3, { tabOrder = 1, x = Helper.borderSize, y = Helper.borderSize, width = width })
+  ftable:setColWidth(1, Helper.standardTextHeight)
+  ftable:setColWidthPercent(3, 50)
+
+  if picker.islist then
+    local titleRow = ftable:addRow(true, { fixed = true })
+    titleRow[1]:createCheckBox(function () return #picker.options == StandingOrders.pickerNumSelected() end, { height = Helper.standardTextHeight })
+    titleRow[1].handlers.onClick = function (_, checked) return StandingOrders.checkboxPickerToggleAll(checked) end
+    titleRow[2]:setColSpan(2):createText(title, Helper.headerRowCenteredProperties)
+  else
+    local titleRow = ftable:addRow(false, { fixed = true, bgColor = Color["row_background_blue"] })
+    titleRow[1]:setColSpan(3):createText(title, Helper.headerRowCenteredProperties)
+  end
+
+  if #picker.options == 0 then
+    local row = ftable:addRow(false, {  })
+    row[1]:setColSpan(3):createText("--- " .. ReadText(1001, 32) .. " ---", { halign = "center" })
+  elseif picker.islist then
+    for i = 1, #picker.options do
+      local option = picker.options[i]
+      local row = ftable:addRow(true, {  })
+      row[1]:createCheckBox(function () return picker.selected[option.key] or false end, { height = Helper.standardTextHeight })
+      row[1].handlers.onClick = function (_, checked) return StandingOrders.checkboxPickerOption(option.key, checked) end
+      row[2]:setColSpan(2):createText(option.name)
+    end
+  else
+    for i = 1, #picker.options do
+      local option = picker.options[i]
+      local row = ftable:addRow(true, {  })
+      row[1]:setColSpan(3):createButton({ bgColor = Color["button_background_hidden"], height = Helper.standardTextHeight }):setText(option.name)
+      row[1].handlers.onClick = function () return StandingOrders.buttonPickerSetValue(option.value) end
+    end
+  end
+
+  --- buttons ---
+  local buttontable = frame:addTable(2, { tabOrder = 2, x = Helper.borderSize, width = width, reserveScrollBar = false, highlightMode = "off" })
+  local buttonRow = buttontable:addRow(true, { fixed = true })
+  if picker.islist then
+    -- Same gate ego puts on its own confirm: a required list may not be emptied, and an untouched
+    -- selection has nothing to write.
+    buttonRow[1]:createButton({ active = function ()
+      return ((not picker.param.required) or (StandingOrders.pickerNumSelected() > 0)) and StandingOrders.isPickerSelectionChanged()
+    end }):setText(ReadText(1001, 14), { halign = "center" })
+    buttonRow[1].handlers.onClick = StandingOrders.buttonPickerSetList
+  end
+  buttonRow[2]:createButton():setText(ReadText(1001, 64), { halign = "center" })
+  buttonRow[2].handlers.onClick = StandingOrders.buttonClosePicker
+  buttontable:setSelectedRow(buttonRow.index)
+  buttontable:setSelectedCol(2)
+
+  --- layout ---
+  local buttonHeight = buttontable:getFullHeight()
+  local maxListHeight = Helper.viewHeight - 2 * Helper.borderSize - ftable.properties.y - buttonHeight - 2 * Helper.borderSize
+  if ftable:getFullHeight() > maxListHeight then
+    ftable.properties.maxVisibleHeight = maxListHeight
+  end
+  buttontable.properties.y = ftable.properties.y + ftable:getVisibleHeight() + Helper.borderSize
+
+  centerFrameVertically(frame)
+
+  frame:display()
+
+  StandingOrders.ensurePaused()
+  return true
+end
+
+-- Reason a ship would be skipped, or nil. Re-evaluated on every dialog build, since editing a ware
+-- param changes what the queue demands of a hold.
+function StandingOrders.targetIssue(shipId, transportTypes)
+  if StandingOrders.isBlocked(shipId) then
+    return ReadText(1972092408, 10324)
+  end
+  for i = 1, #transportTypes do
+    if StandingOrders.getCargoCapacity(shipId, transportTypes[i]) == 0 then
+      return ReadText(1972092408, 10125)
+    end
+  end
+  return nil
 end
 
 function StandingOrders.cloneOrdersPrepare()
@@ -883,6 +1234,16 @@ function StandingOrders.cloneOrdersConfirm()
 
   local sourceId = StandingOrders.sourceId
   local targetIds = StandingOrders.targetIds
+
+  StandingOrders.refreshStagedCapacities()
+  local transportTypes = StandingOrders.stagedTransportTypes()
+  local targetIssues = {}
+  local anyTargetUsable = false
+  for i = 1, #targetIds do
+    targetIssues[i] = StandingOrders.targetIssue(targetIds[i], transportTypes)
+    anyTargetUsable = anyTargetUsable or (targetIssues[i] == nil)
+  end
+  local sourceIssue = StandingOrders.targetIssue(sourceId, transportTypes)
 
   local sourceName = getShipName(sourceId)
   local title = ReadText(1972092408, 10320)
@@ -959,11 +1320,10 @@ function StandingOrders.cloneOrdersConfirm()
   function zipper.add(rowdata, properties)
     local row = ftable:addRow(rowdata, properties)
     if zipper.next <= #targetIds then
-      local targetId = targetIds[zipper.next]
-      local isBlocked = StandingOrders.isBlocked(targetId)
-      row[13]:createText(getShipName(targetId), {
-        color = isBlocked and Color["text_inactive"] or Color["text_player_current"],
-        mouseOverText = isBlocked and ReadText(1972092408, 10324) or nil,
+      local issue = targetIssues[zipper.next]
+      row[13]:createText(getShipName(targetIds[zipper.next]), {
+        color = issue and Color["text_inactive"] or Color["text_player_current"],
+        mouseOverText = issue,
       })
       zipper.next = zipper.next + 1
     end
@@ -995,19 +1355,17 @@ function StandingOrders.cloneOrdersConfirm()
     StandingOrders.refreshCloneDialog()
   end
   advancedRow[2]:setColSpan(5):createText(ReadText(1001, 8361))
-  local sourceBlocked = StandingOrders.sourceBlocked
-  local blockedText = ReadText(1972092408, 10324)
   advancedRow[7]:createCheckBox(StandingOrders.applyToSource, {
-    active = not sourceBlocked,
+    active = sourceIssue == nil,
     width = Helper.standardTextHeight,
-    mouseOverText = sourceBlocked and blockedText or nil,
+    mouseOverText = sourceIssue,
   })
   advancedRow[7].handlers.onClick = function (_, checked)
     StandingOrders.applyToSource = checked
   end
   advancedRow[8]:setColSpan(6):createText(ReadText(1972092408, 10323), {
-    color = sourceBlocked and Color["text_inactive"] or nil,
-    mouseOverText = sourceBlocked and blockedText or nil,
+    color = sourceIssue and Color["text_inactive"] or nil,
+    mouseOverText = sourceIssue,
   })
 
   local buttonRow = buttontable:addRow(true, { fixed = true })
@@ -1018,15 +1376,7 @@ function StandingOrders.cloneOrdersConfirm()
   end
   -- Re-evaluated by Helper, since the apply-to-source checkbox does not rebuild the dialog.
   local canApply = function ()
-    if StandingOrders.applyToSource and not sourceBlocked then
-      return true
-    end
-    for i = 1, #targetIds do
-      if not StandingOrders.isBlocked(targetIds[i]) then
-        return true
-      end
-    end
-    return false
+    return anyTargetUsable or (StandingOrders.applyToSource and (sourceIssue == nil))
   end
   buttonRow[10]:setColSpan(2):createButton({ active = canApply }):setText(ReadText(1001, 2821), { halign = "center" })
   buttonRow[10].handlers.onClick = function ()
@@ -1085,11 +1435,7 @@ function StandingOrders.cloneOrdersExecute()
   debugTrace("Executing clone orders from source " .. getShipName(sourceId) .. " to " .. tostring(#targets) .. " ships")
 
   -- Capacities are read once, before any queue is touched.
-  for j = 1, #staged do
-    local entry = staged[j]
-    entry.transportType = findWareTransportType(entry.params)
-    entry.sourceCapacity = entry.transportType and StandingOrders.getCargoCapacity(sourceId, entry.transportType) or nil
-  end
+  StandingOrders.refreshStagedCapacities()
 
   local processedOrders = 0
   for i = 1, #targets do
@@ -1165,6 +1511,7 @@ function StandingOrders.cloneOrdersReset()
   StandingOrders.sourceId = 0
   StandingOrders.targetIds = {}
   StandingOrders.staged = {}
+  StandingOrders.picker = nil
   StandingOrders.queueTable = nil
   StandingOrders.queueTopRow = nil
   StandingOrders.applyToSource = false
@@ -1210,6 +1557,7 @@ end
 local ownContextModes = {
   standing_orders_alert = true,
   standing_orders_clone_confirm = true,
+  standing_orders_param_picker = true,
 }
 
 -- onTableMouseOver clears menu.picking; onTableMouseOut only restores it if the cursor leaves the
@@ -1227,24 +1575,31 @@ local function hookCloseContextMenu(menu)
   end
   menu.standingOrdersCloseContextMenu = menu.closeContextMenu
   menu.closeContextMenu = function (dueToClose, keepmenu)
-    local wasOwn = ownContextModes[menu.contextMenuMode] == true
-    local wasDialog = menu.contextMenuMode == "standing_orders_clone_confirm"
+    local mode = menu.contextMenuMode
     local result = menu.standingOrdersCloseContextMenu(dueToClose, keepmenu)
-    if wasOwn then
+    if ownContextModes[mode] then
       if menu.holomap and (menu.holomap ~= 0) then
         menu.picking = true
       end
       menu.currentMouseOverTable = nil
     end
-    if wasDialog and not StandingOrders.rebuilding then
-      StandingOrders.releasePause()
+    if not StandingOrders.rebuilding then
+      if mode == "standing_orders_param_picker" then
+        -- The picker has no parent frame to fall back to, so every close route -- its Cancel, the
+        -- frame's X, closeOnUnhandledClick -- has to put the dialog back itself.
+        StandingOrders.picker = nil
+        StandingOrders.refreshCloneDialog()
+      elseif mode == "standing_orders_clone_confirm" then
+        StandingOrders.releasePause()
+      end
     end
     return result
   end
 end
 
 -- The map menu's cleanup nils contextMenuMode without going through closeContextMenu, so closing
--- the map with the dialog open would otherwise leave the game paused for good.
+-- the map with the dialog open would otherwise leave the game paused for good -- and a picker left
+-- staged here would be rendered again by the next refresh of an unrelated dialog.
 local function hookCleanup(menu)
   if type(menu) ~= "table" or type(menu.cleanup) ~= "function" then
     debugTrace("hookCleanup: no usable map menu")
@@ -1256,6 +1611,7 @@ local function hookCleanup(menu)
   menu.standingOrdersCleanup = menu.cleanup
   menu.cleanup = function (...)
     StandingOrders.releasePause()
+    StandingOrders.picker = nil
     return menu.standingOrdersCleanup(...)
   end
 end
