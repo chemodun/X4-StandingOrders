@@ -22,6 +22,8 @@
       <t id="10320">Conferma clonazione ordini</t>
       <t id="10321">Origine:</t>
       <t id="10322">Navi bersaglio:</t>
+      <t id="10323">Applica le modifiche anche alla nave di origine</t>
+      <t id="10324">La coda ordini di questa nave non può essere svuotata</t>
     </page>
   </add>
 </diff>

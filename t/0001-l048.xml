@@ -22,6 +22,8 @@
       <t id="10320">Potwierdź klonowanie poleceń</t>
       <t id="10321">Źródło:</t>
       <t id="10322">Statki docelowe:</t>
+      <t id="10323">Zastosuj zmiany także do statku źródłowego</t>
+      <t id="10324">Kolejki rozkazów tego statku nie można wyczyścić</t>
     </page>
   </add>
 </diff>

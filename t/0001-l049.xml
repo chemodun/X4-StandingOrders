@@ -22,6 +22,8 @@
       <t id="10320">Klonen der Befehle bestätigen</t>
       <t id="10321">Quelle:</t>
       <t id="10322">Zielschiffe:</t>
+      <t id="10323">Änderungen auch auf das Quellschiff anwenden</t>
+      <t id="10324">Die Befehlsliste dieses Schiffs kann nicht geleert werden</t>
     </page>
   </add>
 </diff>

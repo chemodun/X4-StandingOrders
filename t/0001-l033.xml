@@ -22,6 +22,8 @@
       <t id="10320">Confirmer le clonage des ordres</t>
       <t id="10321">Source:</t>
       <t id="10322">Vaisseaux cibles:</t>
+      <t id="10323">Appliquer aussi les modifications au vaisseau source</t>
+      <t id="10324">La file d'ordres de ce vaisseau ne peut pas être vidée</t>
     </page>
   </add>
 </diff>

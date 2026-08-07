@@ -22,6 +22,8 @@
       <t id="10320">Confirm cloning orders</t>
       <t id="10321">Source:</t>
       <t id="10322">Target ships:</t>
+      <t id="10323">Apply changes to the source ship too</t>
+      <t id="10324">The order queue of this ship cannot be cleared</t>
     </page>
   </add>
 </diff>

@@ -22,6 +22,8 @@
       <t id="10320">Confirmar clonación de órdenes</t>
       <t id="10321">Origen:</t>
       <t id="10322">Naves objetivo:</t>
+      <t id="10323">Aplicar los cambios también a la nave de origen</t>
+      <t id="10324">La cola de órdenes de esta nave no se puede vaciar</t>
     </page>
   </add>
 </diff>

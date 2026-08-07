@@ -22,6 +22,8 @@
       <t id="10320">Confirmar clonagem de ordens</t>
       <t id="10321">Origem:</t>
       <t id="10322">Naves alvo:</t>
+      <t id="10323">Aplicar as alterações também à nave de origem</t>
+      <t id="10324">A fila de ordens desta nave não pode ser limpa</t>
     </page>
   </add>
 </diff>
