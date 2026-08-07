@@ -89,11 +89,17 @@ To deselect the current source ship, right-click on it in the map view and choos
 [size=3][u][i]Result of Cloning[/i][/u][/size]
 
 After confirming the cloning operation, the selected target ships will receive the cloned Repeat Orders from the source ship.
-
+[list]
+[*] Source ship will remain unchanged, unless you not checked the [b]Apply changes to source ship[/b] option in the cloning dialog.
+[/list]
 [img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/source_ship.png[/img]
-
+[list]
+[*] Target ships will receive the cloned Repeat Orders unchanged.
+[/list]
 [img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/cloned_ship_without_changes.png[/img]
-
+[list]
+[*] Or, if you edited the orders in the cloning dialog, the target ships will receive the edited Repeat Orders.
+[/list]
 [img]https://raw.githubusercontent.com/chemodun/X4-StandingOrders/refs/heads/main/docs/images/cloned_ship_with_another_capacity_and_edited_order.png[/img]
 
 [size=3][u][b]Extension Options[/b][/u][/size]
