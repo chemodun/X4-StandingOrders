@@ -24,6 +24,12 @@
       <t id="10322">Zielschiffe:</t>
       <t id="10323">Änderungen auch auf das Quellschiff anwenden</t>
       <t id="10324">Die Befehlsliste dieses Schiffs kann nicht geleert werden</t>
+      <!-- Section: Debug (90900) -->
+      <t id="90900">Debug</t>
+      <t id="90910">Debug-Stufe</t>
+      <t id="90911">Keine</t>
+      <t id="90912">Debug</t>
+      <t id="90913">Ablaufverfolgung</t>
     </page>
   </add>
 </diff>

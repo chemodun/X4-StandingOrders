@@ -24,6 +24,12 @@
       <t id="10322">Navi bersaglio:</t>
       <t id="10323">Applica le modifiche anche alla nave di origine</t>
       <t id="10324">La coda ordini di questa nave non può essere svuotata</t>
+      <!-- Section: Debug (90900) -->
+      <t id="90900">Debug</t>
+      <t id="90910">Livello di debug</t>
+      <t id="90911">Nessuno</t>
+      <t id="90912">Debug</t>
+      <t id="90913">Traccia</t>
     </page>
   </add>
 </diff>

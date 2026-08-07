@@ -24,6 +24,12 @@
       <t id="10322">Naves alvo:</t>
       <t id="10323">Aplicar as alterações também à nave de origem</t>
       <t id="10324">A fila de ordens desta nave não pode ser limpa</t>
+      <!-- Section: Debug (90900) -->
+      <t id="90900">Depuração</t>
+      <t id="90910">Nível de depuração</t>
+      <t id="90911">Nenhum</t>
+      <t id="90912">Depuração</t>
+      <t id="90913">Rastreamento</t>
     </page>
   </add>
 </diff>

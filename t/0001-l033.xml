@@ -24,6 +24,12 @@
       <t id="10322">Vaisseaux cibles:</t>
       <t id="10323">Appliquer aussi les modifications au vaisseau source</t>
       <t id="10324">La file d'ordres de ce vaisseau ne peut pas être vidée</t>
+      <!-- Section: Debug (90900) -->
+      <t id="90900">Débogage</t>
+      <t id="90910">Niveau de débogage</t>
+      <t id="90911">Aucun</t>
+      <t id="90912">Débogage</t>
+      <t id="90913">Trace</t>
     </page>
   </add>
 </diff>

@@ -1,20 +1,27 @@
 # Standing Orders
 
-Standing Orders adds a lightweight interface that lets you clone a Repeat Orders queue from one of player's ship to any number of other player-owned ships.
+Standing Orders adds a lightweight interface that lets you clone a Repeat Orders queue from one of player's ship to any number of other player-owned ships - and edit that queue before it is applied.
 
 ## Features
 
 - Clone a ship’s running Repeat Orders onto any selection of eligible targets in a single confirmation step.
 - Works with **any** order that can be placed under Repeat Orders, not just trade orders - every parameter of every order is copied.
-- Automatically scales cargo amounts to each target’s hold size, matching the transport type the order actually uses.
-- Target ships only need cargo capacity when the source queue actually trades wares, so queues of non-trade orders can be cloned to any capable ship.
+- Review and edit the queue before applying it, shown exactly as the map's **Behaviour** tab shows it.
+- Optionally apply the edited queue back to the source ship as well.
+- Automatically scales cargo amounts (if used as params) to each target’s hold size, matching the transport type the order actually uses.
 
 ## Requirements
 
-- `X4: Foundations` 7.60 or newer (tested on 7.60 and 8.00).
-- `Mod Support APIs` by [SirNukes](https://next.nexusmods.com/profile/sirnukes?gameId=2659) to be installed and enabled. Version `1.93` and upper is required.
+- `X4: Foundations` 8.00 and 9.00. For 7.60 use the version 1.00 (as 2.00 required mods requires 8.00).
+- `Mod Support APIs` by [SirNukes](https://next.nexusmods.com/profile/sirnukes?gameId=2659) to be installed and enabled. Version `1.95` and upper is required.
   - It is available via Steam - [SirNukes Mod Support APIs](https://steamcommunity.com/sharedfiles/filedetails/?id=2042901274)
   - Or via the Nexus Mods - [Mod Support APIs](https://www.nexusmods.com/x4foundations/mods/503)
+- `Options Helper`, to provide the in-game Debug Level option. Version `1.10` and upper is required.
+  - It is available via Steam - [Options Helper](https://steamcommunity.com/sharedfiles/filedetails/?id=3715253556)
+  - Or via the Nexus Mods - [Options Helper](https://www.nexusmods.com/x4foundations/mods/2089)
+- `Print Extension List`, to record the game version and the enabled extensions in the log. Version `1.01` and upper is required.
+  - It is available via Steam - [Print Extension List](https://steamcommunity.com/sharedfiles/filedetails/?id=3770927339)
+  - Or via the Nexus Mods - [Print Extension List](https://www.nexusmods.com/x4foundations/mods/2191)
 
 ## Installation
 
@@ -54,11 +61,15 @@ Again, you will get warning messages if no valid target ships are selected.
 
 ![No Valid Targets](docs/images/no_valid_targets.png)
 
-### Confirming Cloning
+### Cloning Dialog
 
-After selecting valid target ships, you will get a confirmation dialog showing the summary of the cloning operation.
+After selecting valid target ships, you will get a dialog showing the summary of the cloning operation.
 
-![Clone Confirmation Dialog](docs/images/clone_confirmation_dialog.png)
+![Cloning Dialog](docs/images/clone_dialog.png)
+
+![Cloning Dialog to Multiple Targets](docs/images/clone_dialog_to_multiple.png)
+
+![Cloning Dialog to Multiple Targets Edited](docs/images/clone_dialog_to_mutiple_edited.png)
 
 You can confirm or cancel the operation.
 In addition, you can `Deselect as Source` ship if you want to choose a different source ship.
@@ -73,17 +84,21 @@ To deselect the current source ship, right-click on it in the map view and choos
 
 After confirming the cloning operation, the selected target ships will receive the cloned Repeat Orders from the source ship.
 
-#### Before Cloning
+![Source Ship](docs/images/source_ship.png)
 
-![First Target Before Cloning](docs/images/first_target_before_cloning.png)
-![Second Target Before Cloning](docs/images/second_target_before_cloning.png)
+![Cloned Ship Without Changes](docs/images/cloned_ship_without_changes.png)
 
-#### After Cloning
+![Cloned Ship With Another Capacity and Edited Order](docs/images/cloned_ship_with_another_capacity_and_edited_order.png)
 
-![First Target After Cloning](docs/images/first_target_after_cloning.png)
-![Second Target After Cloning](docs/images/second_target_after_cloning.png)
+## Extension Options
 
-You can compare it with example of the source ship's Repeat Orders shown at the beginning of `Usage` chapter.
+The mod adds a `Standing Orders` page to `Settings` - `Extensions Options`, with a single setting:
+
+- **Debug Level** - how much the mod writes to the game log. `None` is the default and keeps the log clean, `Debug` records one line per action taken, and `Trace` adds the per-ship and per-order detail. Use `Debug` or `Trace` when preparing a bug report, then set it back to `None`.
+
+![Extension Options](docs/images/options.png)
+
+The setting takes effect immediately, no reload needed.
 
 ## Video
 
@@ -102,26 +117,17 @@ You can compare it with example of the source ship's Repeat Orders shown at the 
 
 ## Changelog
 
-### [1.01] - 2026-08-??
+### [2.00] - 2026-08-07
 
+- Improved
+  - Fully refactored to work with any order in Repeat Orders queue.
+  - Uses the UI equal to the map's Behaviour tab to show the orders.
+  - Allows changing any parameter of the orders before applying them to the target ships.
+  - Allows applying the edited queue back to the source ship as well.
 - Added
-  - Any order that can run under Repeat Orders can now be cloned, not only Single Buy and Single Sell - all parameters of every order are copied, including radii, positions, price thresholds and object lists
-  - The confirmation dialog now lists every order with its parameters, matching what the game's own order queue shows, so you can see what will be copied
-
+  - `Extensions Options` page with a `Debug Level` setting - `None`, `Debug` or `Trace`.
 - Changed
-  - Cargo amounts are scaled using the transport type the order actually uses, instead of always assuming container cargo
-  - Target ships are only required to have cargo capacity when the source queue actually trades wares
-  - The target pilot skill requirement now matches the game's own Repeat Orders skill gate - some pilots that were previously accepted will now be rejected
-  - **Deselect as Source** is now available from any player-owned ship, not only from the source ship itself
-
-- Removed
-  - The unfinished **Add Location** button in the confirmation dialog, which could leave the map menu in a broken state
-
-- Fixed
-  - The mouse no longer stops working on the map after closing one of the mod's dialogs - previously it stayed dead until you moved the cursor over a side bar element
-  - The source ship could end up in its own target list when it was part of the current map selection, which wiped its order queue instead of copying it - the source is now always excluded from the targets
-  - A source ship that was sold, destroyed, captured or wrecked is no longer kept selected - the context menu offers **Select as Source** again instead of a **Clone from** entry with an empty ship name
-  - Cloning is aborted with a warning if the source ship stops being a valid source while the confirmation dialog is open, and target ships that became invalid in the meantime are skipped
+  - `Options Helper` and `Print Extension List` are now required, and `Mod Support APIs` `1.95` is the minimum version.
 
 ### [1.00] - 2025-10-30
 

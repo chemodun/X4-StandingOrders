@@ -76,6 +76,8 @@ ffi.cdef [[
 local StandingOrders = {
   args = {},
   playerId = 0,
+  configBlackboard = "$StandingOrdersConfig",
+  debugLevel = "none", -- "none" = off, "debug" = one line per action, "trace" = per-item detail
   mapMenu = {},
   orderDefs = {},
   loopOrdersSkillLimit = 0,
@@ -135,10 +137,49 @@ local pickerWidth = 350
 
 local Lib = require("extensions.sn_mod_support_apis.ui.Library")
 
-local function debugTrace(message)
-  local text = "StandingOrders: " .. message
-  if type(DebugError) == "function" then
-    DebugError(text)
+-- Messages are often built by concatenation, so only format when args are actually passed:
+-- a ship name containing a percent sign would otherwise break string.format.
+local function write(message, ...)
+  if select("#", ...) > 0 then
+    message = string.format(message, ...)
+  end
+  DebugError("StandingOrders: " .. message)
+end
+
+function StandingOrders.Error(message, ...)
+  write(message, ...)
+end
+
+function StandingOrders.Debug(message, ...)
+  if StandingOrders.debugLevel == "debug" or StandingOrders.debugLevel == "trace" then
+    write(message, ...)
+  end
+end
+
+function StandingOrders.Trace(message, ...)
+  if StandingOrders.debugLevel == "trace" then
+    write(message, ...)
+  end
+end
+
+-- The MD event may arrive before or after the config exists, so the blackboard is the fallback source on load.
+function StandingOrders.ReadDebugLevel()
+  if StandingOrders.playerId == 0 then
+    return
+  end
+  local config = GetNPCBlackboard(StandingOrders.playerId, StandingOrders.configBlackboard)
+  if config and config.debugLevel then
+    StandingOrders.debugLevel = tostring(config.debugLevel)
+  end
+  StandingOrders.Debug("ReadDebugLevel: level: %s", StandingOrders.debugLevel)
+end
+
+function StandingOrders.SetDebugLevel(_, level)
+  if level and level ~= "" then
+    StandingOrders.debugLevel = tostring(level)
+    StandingOrders.Debug("SetDebugLevel: level: %s", StandingOrders.debugLevel)
+  else
+    StandingOrders.ReadDebugLevel()
   end
 end
 
@@ -150,7 +191,7 @@ local function getPlayerId()
 
   local converted = ConvertStringTo64Bit(tostring(current))
   if converted ~= 0 and converted ~= StandingOrders.playerId then
-    debugTrace("updating player_id to " .. tostring(converted))
+    StandingOrders.Trace("updating player_id to " .. tostring(converted))
     StandingOrders.playerId = converted
   end
 end
@@ -207,7 +248,7 @@ local function getOrderDef(orderDef)
       cached.name = ffi.string(buf.name)
       cached.icon = ffi.string(buf.icon)
     else
-      debugTrace("order definition " .. tostring(orderDef) .. " could not be resolved")
+      StandingOrders.Debug("order definition " .. tostring(orderDef) .. " could not be resolved")
     end
     StandingOrders.orderDefs[orderDef] = cached
   end
@@ -244,7 +285,7 @@ end
 
 function StandingOrders.recordResult()
   local data = StandingOrders.args or {}
-  debugTrace("recordResult called for command ".. tostring(data and data.command) .. " with result " .. tostring(data and data.result))
+  StandingOrders.Trace("recordResult called for command ".. tostring(data and data.command) .. " with result " .. tostring(data and data.result))
   if StandingOrders.playerId ~= 0 then
     local payload = data or {}
     SetNPCBlackboard(StandingOrders.playerId, "$StandingOrdersResponse", payload)
@@ -263,7 +304,7 @@ function StandingOrders.reportError(extraInfo)
   end
   StandingOrders.recordResult()
 
-  local message = "StandingOrders error"
+  local message = "error"
   if data.info then
     message = message .. ": " .. tostring(data.info)
   end
@@ -271,7 +312,7 @@ function StandingOrders.reportError(extraInfo)
     message = message .. " (" .. tostring(data.detail) .. ")"
   end
 
-  DebugError(message)
+  StandingOrders.Error(message)
 end
 
 function StandingOrders.reportSuccess(extraStatus)
@@ -423,18 +464,18 @@ end
 function StandingOrders.getArgs()
   StandingOrders.args = {}
   if StandingOrders.playerId == 0 then
-    debugTrace("getArgs unable to resolve player id")
+    StandingOrders.Debug("getArgs unable to resolve player id")
   else
     local list = GetNPCBlackboard(StandingOrders.playerId, "$StandingOrdersRequest")
     if type(list) == "table" then
-      debugTrace("getArgs retrieved " .. tostring(#list) .. " entries from blackboard")
+      StandingOrders.Trace("getArgs retrieved " .. tostring(#list) .. " entries from blackboard")
       StandingOrders.args = list[#list]
       SetNPCBlackboard(StandingOrders.playerId, "$StandingOrdersRequest", nil)
       return true
     elseif list ~= nil then
-      debugTrace("getArgs received non-table payload of type " .. type(list))
+      StandingOrders.Debug("getArgs received non-table payload of type " .. type(list))
     else
-      debugTrace("getArgs found no blackboard entries for player " .. tostring(StandingOrders.playerId))
+      StandingOrders.Trace("getArgs found no blackboard entries for player " .. tostring(StandingOrders.playerId))
     end
   end
   return false
@@ -449,7 +490,7 @@ function StandingOrders.MarkSourceOnMap()
     return
   end
 
-  debugTrace("MapMenu is " .. tostring(StandingOrders.mapMenu) .. " for source " .. source)
+  StandingOrders.Trace("MapMenu is " .. tostring(StandingOrders.mapMenu) .. " for source " .. source)
   if StandingOrders.mapMenu and StandingOrders.mapMenu.holomap and (StandingOrders.mapMenu.holomap ~= 0) then
     StandingOrders.mapMenu.selectedcomponents = {}
     if (args.command == "unmark_source") then
@@ -503,11 +544,11 @@ end
 function StandingOrders.alertMessage(options)
   local menu = StandingOrders.mapMenu
   if type(menu) ~= "table" or type(menu.closeContextMenu) ~= "function" then
-    debugTrace("alertMessage: Invalid menu instance")
+    StandingOrders.Debug("alertMessage: Invalid menu instance")
     return false, "Map menu instance is not available"
   end
   if type(Helper) ~= "table" then
-    debugTrace("alertMessage: Helper UI utilities are not available")
+    StandingOrders.Debug("alertMessage: Helper UI utilities are not available")
     return false, "Helper UI utilities are not available"
   end
 
@@ -784,7 +825,7 @@ end
 function StandingOrders.buttonStartMapPick(entry, paramIdx, param, listIdx)
   local menu = StandingOrders.mapMenu
   if (menu.holomap == nil) or (menu.holomap == 0) then
-    debugTrace("buttonStartMapPick: no holomap to pick on")
+    StandingOrders.Debug("buttonStartMapPick: no holomap to pick on")
     return
   end
 
@@ -1166,7 +1207,7 @@ function StandingOrders.showParamPicker()
   local menu = StandingOrders.mapMenu
   local picker = StandingOrders.picker
   if type(menu) ~= "table" or type(menu.closeContextMenu) ~= "function" or type(Helper) ~= "table" or picker == nil then
-    debugTrace("showParamPicker: map menu instance or picker state is not available")
+    StandingOrders.Debug("showParamPicker: map menu instance or picker state is not available")
     return false
   end
 
@@ -1336,11 +1377,11 @@ end
 function StandingOrders.cloneOrdersConfirm()
   local menu = StandingOrders.mapMenu
   if type(menu) ~= "table" or type(menu.closeContextMenu) ~= "function" then
-    debugTrace("alertMessage: Invalid menu instance")
+    StandingOrders.Debug("alertMessage: Invalid menu instance")
     return false, "Map menu instance is not available"
   end
   if type(Helper) ~= "table" then
-    debugTrace("alertMessage: Helper UI utilities are not available")
+    StandingOrders.Debug("alertMessage: Helper UI utilities are not available")
     return false, "Helper UI utilities are not available"
   end
 
@@ -1460,6 +1501,8 @@ function StandingOrders.cloneOrdersConfirm()
   --- buttons ---
   local buttontable = frame:addTable(13, { tabOrder = 2, x = Helper.borderSize, width = width, reserveScrollBar = false, highlightMode = "off" })
 
+  buttontable:addEmptyRow(Helper.standardTextHeight / 2)
+
   local advancedRow = buttontable:addRow(true, { fixed = true })
   advancedRow[1]:createCheckBox(StandingOrders.showAdvanced, { width = Helper.standardTextHeight })
   advancedRow[1].handlers.onClick = function (_, checked)
@@ -1479,6 +1522,8 @@ function StandingOrders.cloneOrdersConfirm()
     color = sourceIssue and Color["text_inactive"] or nil,
     mouseOverText = sourceIssue,
   })
+
+  buttontable:addEmptyRow(Helper.standardTextHeight / 2)
 
   local buttonRow = buttontable:addRow(true, { fixed = true })
   buttonRow[1]:setColSpan(2):createButton():setText(ReadText(1972092408, 10201), { halign = "center" })
@@ -1526,7 +1571,7 @@ function StandingOrders.cloneOrdersExecute()
   -- The confirmation dialog stays open until the player acts; source and targets can die in between.
   local valid, errorData = StandingOrders.checkShip(StandingOrders.sourceId)
   if not valid then
-    debugTrace("source is no longer valid at execution time - aborting")
+    StandingOrders.Debug("source is no longer valid at execution time - aborting")
     StandingOrders.cloneOrdersReset()
     StandingOrders.reportError(errorData)
     return false, errorData
@@ -1544,7 +1589,7 @@ function StandingOrders.cloneOrdersExecute()
   if StandingOrders.applyToSource and not StandingOrders.sourceBlocked then
     targets[#targets + 1] = sourceId
   end
-  debugTrace("Executing clone orders from source " .. getShipName(sourceId) .. " to " .. tostring(#targets) .. " ships")
+  StandingOrders.Debug("Executing clone orders from source " .. getShipName(sourceId) .. " to " .. tostring(#targets) .. " ships")
 
   -- Capacities are read once, before any queue is touched.
   StandingOrders.refreshStagedCapacities()
@@ -1552,13 +1597,13 @@ function StandingOrders.cloneOrdersExecute()
   local processedOrders = 0
   for i = 1, #targets do
     local targetId = targets[i]
-    debugTrace("Cloning orders to target " .. getShipName(targetId))
+    StandingOrders.Trace("Cloning orders to target " .. getShipName(targetId))
     if StandingOrders.isBlocked(targetId) then
-      debugTrace("skipping target " .. getShipName(targetId) .. " - order queue cannot be cleared")
+      StandingOrders.Debug("skipping target " .. getShipName(targetId) .. " - order queue cannot be cleared")
     elseif not StandingOrders.checkShip(targetId, transportTypes) then
-      debugTrace("skipping target " .. getShipName(targetId) .. " - no longer valid")
+      StandingOrders.Debug("skipping target " .. getShipName(targetId) .. " - no longer valid")
     elseif not C.RemoveAllOrders(targetId) then
-      debugTrace("failed to clear target order queue for " .. getShipName(targetId))
+      StandingOrders.Error("failed to clear target order queue for " .. getShipName(targetId))
     else
       C.CreateOrder(targetId, "Wait", true)
       C.EnablePlannedDefaultOrder(targetId, false)
@@ -1590,11 +1635,11 @@ function StandingOrders.cloneOrdersExecute()
               end
             end
           end
-          debugTrace(" Created order " .. tostring(order.orderdef) .. " on target " .. getShipName(targetId) .. " at index " .. tostring(newOrderIdx))
+          StandingOrders.Trace(" Created order " .. tostring(order.orderdef) .. " on target " .. getShipName(targetId) .. " at index " .. tostring(newOrderIdx))
           C.EnableOrder(targetId, newOrderIdx)
           processedOrders = processedOrders + 1
         else
-          debugTrace(" Failed to create order " .. tostring(order.orderdef) .. " on target " .. getShipName(targetId))
+          StandingOrders.Error(" Failed to create order " .. tostring(order.orderdef) .. " on target " .. getShipName(targetId))
         end
       end
     end
@@ -1642,11 +1687,11 @@ function StandingOrders.ProcessRequest(_, _)
       StandingOrders.releasePause()
     end
     if not StandingOrders.getArgs() then
-      debugTrace("ProcessRequest invoked without args or invalid args")
+      StandingOrders.Debug("ProcessRequest invoked without args or invalid args")
       StandingOrders.reportError({info ="missing_args"})
       return
     end
-    debugTrace("ProcessRequest received command: " .. tostring(StandingOrders.args.command))
+    StandingOrders.Debug("ProcessRequest received command: " .. tostring(StandingOrders.args.command))
     if StandingOrders.args.command == "mark_source" then
       local valid, errorData = StandingOrders.isValidSourceShip(StandingOrders.args.source)
       if valid then
@@ -1665,11 +1710,11 @@ function StandingOrders.ProcessRequest(_, _)
         StandingOrders.reportError(errorData)
       end
     else
-      debugTrace("ProcessRequest received unknown command: " .. tostring(StandingOrders.args.command))
+      StandingOrders.Debug("ProcessRequest received unknown command: " .. tostring(StandingOrders.args.command))
       StandingOrders.reportError({ info = "UnknownCommand" })
     end
   else
-    debugTrace("ProcessRequest invoked but no MapMenu or Holomap available")
+    StandingOrders.Debug("ProcessRequest invoked but no MapMenu or Holomap available")
     StandingOrders.reportError({ info = "NoMap" })
   end
 end
@@ -1686,7 +1731,7 @@ local ownContextModes = {
 -- funnel all close routes share -- our buttons, the frame's X, and closeOnUnhandledClick.
 local function hookCloseContextMenu(menu)
   if type(menu) ~= "table" or type(menu.closeContextMenu) ~= "function" then
-    debugTrace("hookCloseContextMenu: no usable map menu")
+    StandingOrders.Debug("hookCloseContextMenu: no usable map menu")
     return
   end
   -- Kept on the menu itself, which outlives a reload of this module, so the wrapper cannot stack.
@@ -1724,7 +1769,7 @@ end
 -- staged here would be rendered again by the next refresh of an unrelated dialog.
 local function hookCleanup(menu)
   if type(menu) ~= "table" or type(menu.cleanup) ~= "function" then
-    debugTrace("hookCleanup: no usable map menu")
+    StandingOrders.Debug("hookCleanup: no usable map menu")
     return
   end
   if menu.standingOrdersCleanup ~= nil then
@@ -1749,7 +1794,7 @@ end
 -- pick by redrawing the info panel it was started from; ours has to put the dialog back.
 local function hookResetOrderParamMode(menu)
   if type(menu) ~= "table" or type(menu.resetOrderParamMode) ~= "function" then
-    debugTrace("hookResetOrderParamMode: no usable map menu")
+    StandingOrders.Debug("hookResetOrderParamMode: no usable map menu")
     return
   end
   if menu.standingOrdersResetOrderParamMode ~= nil then
@@ -1771,9 +1816,12 @@ function StandingOrders.Init()
   getPlayerId()
   ---@diagnostic disable-next-line: undefined-global
   RegisterEvent("StandingOrders.Request", StandingOrders.ProcessRequest)
+  ---@diagnostic disable-next-line: undefined-global
+  RegisterEvent("StandingOrders.SetDebugLevel", StandingOrders.SetDebugLevel)
+  StandingOrders.ReadDebugLevel()
   AddUITriggeredEvent("StandingOrders", "Reloaded")
   StandingOrders.mapMenu = Lib.Get_Egosoft_Menu("MapMenu")
-  debugTrace("MapMenu is " .. tostring(StandingOrders.mapMenu))
+  StandingOrders.Trace("MapMenu is " .. tostring(StandingOrders.mapMenu))
   hookCloseContextMenu(StandingOrders.mapMenu)
   hookCleanup(StandingOrders.mapMenu)
   hookResetOrderParamMode(StandingOrders.mapMenu)

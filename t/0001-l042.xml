@@ -24,6 +24,12 @@
       <t id="10322">Cílové lodě:</t>
       <t id="10323">Použít změny i na zdrojovou loď</t>
       <t id="10324">Frontu rozkazů této lodi nelze vymazat</t>
+      <!-- Section: Debug (90900) -->
+      <t id="90900">Ladění</t>
+      <t id="90910">Úroveň ladění</t>
+      <t id="90911">Žádná</t>
+      <t id="90912">Ladění</t>
+      <t id="90913">Trasování</t>
     </page>
   </add>
 </diff>

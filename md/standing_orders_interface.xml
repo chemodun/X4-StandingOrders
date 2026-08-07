@@ -2,12 +2,41 @@
 <mdscript name="Standing_Orders_Interface" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <cues>
 
-    <cue name="Main" version="3">
+    <cue name="Main" version="4">
       <actions>
-        <debug_text text="'StandingOrders: Main'" chance="100" filter="scripts" />
+        <include_actions ref="ReadDebugChances" />
+        <debug_text text="'StandingOrders: Main'" chance="$debugChance" filter="scripts" />
+        <include_actions ref="ClearDebugChances" />
         <set_value name="$sourceShipForCloning" exact="null" />
       </actions>
       <cues>
+        <!-- $debugChance for one line per action, $traceChance for per-item detail. Callers must include
+             ClearDebugChances when done. -->
+        <library name="ReadDebugChances" purpose="include_actions">
+          <actions>
+            <set_value name="$soDebugLevel" exact="if @player.entity.$StandingOrdersConfig.$debugLevel != null
+              then player.entity.$StandingOrdersConfig.$debugLevel else 'none'" />
+            <set_value name="$debugChance" exact="if @$soDebugLevel == null or @$soDebugLevel == 'none' then 0 else 100" />
+            <set_value name="$traceChance" exact="if @$soDebugLevel == 'trace' then 100 else 0" />
+            <remove_value name="$soDebugLevel" />
+          </actions>
+        </library>
+
+        <library name="ClearDebugChances" purpose="include_actions">
+          <actions>
+            <remove_value name="$debugChance" />
+            <remove_value name="$traceChance" />
+          </actions>
+        </library>
+
+        <library name="Defaults" purpose="include_actions">
+          <actions>
+            <set_value name="$cfg" exact="table[
+              $debugLevel = 'none',
+            ]" />
+          </actions>
+        </library>
+
         <!-- A stored source can silently stop being one: sold (owner changes, then MoveDie destroys it),
              destroyed, boarded or wrecked. Nothing else clears it, so re-check before every use. -->
         <library name="Validate_Source" purpose="include_actions">
@@ -19,65 +48,75 @@
                             @$sourceShipForCloning.isoperational and
                             not @$sourceShipForCloning.iswreck" negate="true">
                 <debug_text text="'StandingOrders: stored source %s is no longer valid - clearing it'.[@$sourceShipForCloning.debugname]"
-                  chance="100" filter="scripts" />
+                  chance="$debugChance" filter="scripts" />
                 <set_value name="$sourceShipForCloning" exact="null" />
               </do_if>
             </do_if>
           </actions>
         </library>
 
-        <cue name="On_Reload" instantiate="true">
+        <cue name="On_Reload" version="2" instantiate="true">
           <conditions>
             <event_ui_triggered screen="'StandingOrders'" control="'Reloaded'" />
           </conditions>
           <actions>
-            <debug_text text="'StandingOrders: On_Reload'" chance="100" filter="scripts" />
+            <include_actions ref="ReadDebugChances" />
+            <debug_text text="'StandingOrders: On_Reload'" chance="$debugChance" filter="scripts" />
+            <include_actions ref="ClearDebugChances" />
             <signal_cue_instantly cue="Reloaded" />
           </actions>
         </cue>
 
-        <cue name="On_Game_Loaded" instantiate="true">
+        <cue name="On_Game_Loaded" version="2" instantiate="true">
           <conditions>
             <event_game_loaded />
           </conditions>
           <actions>
-            <debug_text text="'StandingOrders: On_Game_Loaded'" chance="100" filter="general" />
+            <include_actions ref="ReadDebugChances" />
+            <debug_text text="'StandingOrders: On_Game_Loaded'" chance="$debugChance" filter="general" />
+            <include_actions ref="ClearDebugChances" />
             <signal_cue_instantly cue="Reloaded" />
           </actions>
         </cue>
 
-        <cue name="Reloaded" instantiate="true">
+        <cue name="Reloaded" version="2" instantiate="true">
           <conditions>
             <event_cue_signalled />
           </conditions>
           <actions>
-            <debug_text text="'StandingOrders: Reloaded'" chance="100" filter="general" />
+            <include_actions ref="ReadDebugChances" />
+            <debug_text text="'StandingOrders: Reloaded'" chance="$debugChance" filter="general" />
+            <include_actions ref="ClearDebugChances" />
             <set_value name="$sourceShipForCloning" exact="null" />
           </actions>
         </cue>
 
-        <cue name="On_Get_Actions" version="2" instantiate="true">
+        <cue name="On_Get_Actions" version="3" instantiate="true">
           <conditions>
             <event_cue_signalled cue="md.Interact_Menu_API.Get_Actions" />
-            <debug_text text="'StandingOrders: Get_Actions invoked with param: %s'.[event.param]" chance="100" filter="scripts" />
-            <debug_text text="'StandingOrders: Get_Actions invoked with object: %s'.[@event.param.$object]" chance="100" filter="scripts" />
+            <!-- Conditions cannot run include_actions, so the trace level is read inline here. -->
+            <debug_text text="'StandingOrders: Get_Actions invoked with param: %s'.[event.param]"
+              debugchance="if @player.entity.$StandingOrdersConfig.$debugLevel == 'trace' then 100 else 0" filter="scripts" />
+            <debug_text text="'StandingOrders: Get_Actions invoked with object: %s'.[@event.param.$object.debugname]"
+              debugchance="if @player.entity.$StandingOrdersConfig.$debugLevel == 'trace' then 100 else 0" filter="scripts" />
             <check_value value="player.holomap.isopen" />
             <check_value value="event.param.$object? and @event.param.$object != null" />
-            <debug_text text="'StandingOrders: Get_Actions invoked with object.class: %s'.[@event.param.$object.class]" chance="100"
-              filter="scripts" />
+            <debug_text text="'StandingOrders: Get_Actions invoked with object.class: %s'.[@event.param.$object.class]"
+              debugchance="if @player.entity.$StandingOrdersConfig.$debugLevel == 'trace' then 100 else 0" filter="scripts" />
             <check_value value="@event.param.$object.isclass.{class.ship}" />
             <check_value value="@event.param.$object.trueowner == faction.player" />
             <check_value value="@event.param.$object.isoperational" />
             <check_value value="@event.param.$object.iswreck" negate="true" />
           </conditions>
           <actions>
+            <include_actions ref="ReadDebugChances" />
             <include_actions ref="Validate_Source" />
             <set_value name="$params" exact="@event.param" />
             <debug_text
-              text="'StandingOrders: sourceShipForCloning: %s, selectedplayerships.count: %s'.[@$sourceShipForCloning, @$params.$selectedplayerships.count]"
-              chance="100" filter="scripts" />
+              text="'StandingOrders: sourceShipForCloning: %s, selectedplayerships.count: %s'.[@$sourceShipForCloning.debugname, @$params.$selectedplayerships.count]"
+              chance="$traceChance" filter="scripts" />
             <do_if value="@$sourceShipForCloning == null">
-              <debug_text text="'StandingOrders: Updating interaction menu actions to add Source Selection'" chance="100"
+              <debug_text text="'StandingOrders: Updating interaction menu actions to add Source Selection'" chance="$traceChance"
                 filter="scripts" />
               <do_if value="@$params.$selectedplayerships.count gt 0" negate="true">
                 <signal_cue_instantly
@@ -94,7 +133,7 @@
               </do_if>
             </do_if>
             <do_elseif value="@$sourceShipForCloning == @event.param.$object">
-              <debug_text text="'StandingOrders: Updating interaction menu actions to add Deselect Source Selection'" chance="100"
+              <debug_text text="'StandingOrders: Updating interaction menu actions to add Deselect Source Selection'" chance="$traceChance"
                 filter="scripts" />
               <do_if value="@$params.$selectedplayerships.count gt 0" negate="true">
                 <signal_cue_instantly
@@ -111,7 +150,7 @@
               </do_if>
             </do_elseif>
             <do_else>
-              <debug_text text="'StandingOrders: Source selected is different from current source. Can be a target for cloning.'" chance="100"
+              <debug_text text="'StandingOrders: Source selected is different from current source. Can be a target for cloning.'" chance="$traceChance"
                 filter="scripts" />
               <set_value name="$sourceFullName" exact="@$sourceShipForCloning.name + ' (' + @$sourceShipForCloning.idcode + ')'" />
               <set_value name="$menuSection" exact="'interaction'" />
@@ -143,15 +182,17 @@
                   $callback   =  Process_Menu
                 ]" />
             </do_else>
+            <include_actions ref="ClearDebugChances" />
           </actions>
         </cue>
 
-        <cue name="Process_Menu" version="3" instantiate="true">
+        <cue name="Process_Menu" version="4" instantiate="true">
           <conditions>
             <event_cue_signalled />
           </conditions>
           <actions>
-            <debug_text text="'StandingOrders: Process_Menu invoked with param: %s'.[event.param]" chance="100" filter="scripts" />
+            <include_actions ref="ReadDebugChances" />
+            <debug_text text="'StandingOrders: Process_Menu invoked with param: %s'.[event.param]" chance="$traceChance" filter="scripts" />
             <include_actions ref="Validate_Source" />
             <set_value name="$args" exact="null" />
             <do_if value="@event.param.$id == 'player_standing_orders_select_source' or @event.param.$id == 'player_standing_orders_deselect_source'">
@@ -162,8 +203,8 @@
                   $source             = if @event.param.$id == 'player_standing_orders_select_source' then @event.param.$object else @$sourceShipForCloning,
                 ]" />
               <set_value name="$sourceShipForCloning" exact="null" />
-              <debug_text text="'StandingOrders: Deselected source for cloning. Current source: %s'.[@$sourceShipForCloning]" chance="100"
-                filter="scripts" />
+              <debug_text text="'StandingOrders: Deselected source for cloning. Current source: %s'.[@$sourceShipForCloning.debugname]"
+                chance="$debugChance" filter="scripts" />
             </do_if>
             <do_elseif value="@event.param.$id == 'player_standing_orders_clone'">
               <do_if value="@$sourceShipForCloning != null">
@@ -189,8 +230,9 @@
                     $source             = @$sourceShipForCloning,
                     $targets            = $targetList,
                   ]" />
-                <debug_text text="'StandingOrders: Prepared clone_orders with source: %s and target: %s'.[@$sourceShipForCloning, @event.param.$object]"
-                  chance="100" filter="scripts" />
+                <debug_text
+                  text="'StandingOrders: Prepared clone_orders with source: %s and target: %s'.[@$sourceShipForCloning.debugname, @event.param.$object.debugname]"
+                  chance="$debugChance" filter="scripts" />
               </do_if>
             </do_elseif>
             <do_if value="$args != null">
@@ -200,40 +242,44 @@
               <append_to_list name="player.entity.$StandingOrdersRequest" exact="$args" />
               <debug_text
                 text="'StandingOrders: Sending %s with args: %s'.[$args.$command, $args]"
-                chance="100" filter="scripts" />
+                chance="$traceChance" filter="scripts" />
               <raise_lua_event name="'StandingOrders.Request'" />
             </do_if>
+            <include_actions ref="ClearDebugChances" />
           </actions>
         </cue>
 
-        <cue name="Process_Results" instantiate="true">
+        <cue name="Process_Results" version="2" instantiate="true">
           <conditions>
             <event_ui_triggered screen="'StandingOrders'" control="'Response'" />
           </conditions>
           <actions>
+            <include_actions ref="ReadDebugChances" />
             <debug_text text="'StandingOrders: Capture_Results invoked with data in $StandingOrdersResponse: %s'.[player.entity.$StandingOrdersResponse]"
-              chance="100" filter="scripts" />
+              chance="$traceChance" filter="scripts" />
             <!--Look
             up the action by id to get the callback.-->
             <set_value name="$result" exact="@player.entity.$StandingOrdersResponse" />
-            <debug_text text="'StandingOrders: Process_Results invoked with result: %s'.[$result]" chance="100" filter="scripts" />
+            <debug_text text="'StandingOrders: Process_Results invoked with result: %s'.[$result]" chance="$traceChance" filter="scripts" />
             <do_if value="$result? and @$result != null">
-              <debug_text text="'StandingOrders: last command %s result: %s'.[@$result.$command, $result]" chance="100" filter="scripts" />
+              <debug_text text="'StandingOrders: last command %s result: %s'.[@$result.$command, $result]" chance="$debugChance" filter="scripts" />
               <do_if value="@$result.$command == 'mark_source' and @$result.$source != null">
                 <do_if value="@$result.$result == 'success' and @$result.$source != null">
                   <set_holomap_target object="@$result.$source" instant="true" />
                   <set_value name="$sourceShipForCloning" exact="@$result.$source" />
-                  <debug_text text="'StandingOrders: Marked source for cloning: %s'.[@$sourceShipForCloning]" chance="100" filter="scripts" />
+                  <debug_text text="'StandingOrders: Marked source for cloning: %s'.[@$sourceShipForCloning.debugname]" chance="$debugChance"
+                    filter="scripts" />
                 </do_if>
               </do_if>
               <do_elseif value="@$result.$command == 'unmark_source' and @$result.$source != null">
                 <do_if value="@$result.$result == 'success'">
                   <set_value name="$sourceShipForCloning" exact="null" />
-                  <debug_text text="'StandingOrders: Unmarked source for cloning. Current source: %s'.[@$sourceShipForCloning]" chance="100"
-                    filter="scripts" />
+                  <debug_text text="'StandingOrders: Unmarked source for cloning. Current source: %s'.[@$sourceShipForCloning.debugname]"
+                    chance="$debugChance" filter="scripts" />
                 </do_if>
               </do_elseif>
             </do_if>
+            <include_actions ref="ClearDebugChances" />
           </actions>
         </cue>
       </cues>

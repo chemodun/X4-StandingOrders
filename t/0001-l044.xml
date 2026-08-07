@@ -24,6 +24,12 @@
       <t id="10322">Target ships:</t>
       <t id="10323">Apply changes to the source ship too</t>
       <t id="10324">The order queue of this ship cannot be cleared</t>
+      <!-- Section: Debug (90900) -->
+      <t id="90900">Debug</t>
+      <t id="90910">Debug Level</t>
+      <t id="90911">None</t>
+      <t id="90912">Debug</t>
+      <t id="90913">Trace</t>
     </page>
   </add>
 </diff>

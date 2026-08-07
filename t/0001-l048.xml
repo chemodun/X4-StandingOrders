@@ -24,6 +24,12 @@
       <t id="10322">Statki docelowe:</t>
       <t id="10323">Zastosuj zmiany także do statku źródłowego</t>
       <t id="10324">Kolejki rozkazów tego statku nie można wyczyścić</t>
+      <!-- Section: Debug (90900) -->
+      <t id="90900">Debugowanie</t>
+      <t id="90910">Poziom debugowania</t>
+      <t id="90911">Brak</t>
+      <t id="90912">Debugowanie</t>
+      <t id="90913">Ślad</t>
     </page>
   </add>
 </diff>

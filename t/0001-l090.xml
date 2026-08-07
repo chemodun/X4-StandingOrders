@@ -24,6 +24,12 @@
       <t id="10322">Hedef gemiler:</t>
       <t id="10323">Değişiklikleri kaynak gemiye de uygula</t>
       <t id="10324">Bu geminin emir sırası temizlenemiyor</t>
+      <!-- Section: Debug (90900) -->
+      <t id="90900">Hata Ayıklama</t>
+      <t id="90910">Hata Ayıklama Seviyesi</t>
+      <t id="90911">Yok</t>
+      <t id="90912">Hata Ayıklama</t>
+      <t id="90913">İzleme</t>
     </page>
   </add>
 </diff>

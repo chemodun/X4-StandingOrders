@@ -24,6 +24,12 @@
       <t id="10322">Naves objetivo:</t>
       <t id="10323">Aplicar los cambios también a la nave de origen</t>
       <t id="10324">La cola de órdenes de esta nave no se puede vaciar</t>
+      <!-- Section: Debug (90900) -->
+      <t id="90900">Depuración</t>
+      <t id="90910">Nivel de depuración</t>
+      <t id="90911">Ninguno</t>
+      <t id="90912">Depuración</t>
+      <t id="90913">Rastreo</t>
     </page>
   </add>
 </diff>
