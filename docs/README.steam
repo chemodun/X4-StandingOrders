@@ -125,6 +125,7 @@ Video demonstration of the Standing Orders. Version 1.00
 [/list]
 [*] Fixed
 [list]
+[*] The mouse no longer stops working on the map after closing one of the mod's dialogs - previously it stayed dead until you moved the cursor over a side bar element
 [*] The source ship could end up in its own target list when it was part of the current map selection, which wiped its order queue instead of copying it - the source is now always excluded from the targets
 [*] A source ship that was sold, destroyed, captured or wrecked is no longer kept selected - the context menu offers [b]Select as Source[/b] again instead of a [b]Clone from[/b] entry with an empty ship name
 [*] Cloning is aborted with a warning if the source ship stops being a valid source while the confirmation dialog is open, and target ships that became invalid in the meantime are skipped
