@@ -1,12 +1,13 @@
 [h1]Standing Orders[/h1]
 
-Standing Orders adds a lightweight interface that lets you clone Repeat Orders trade queues from one of player's ship to any number of other player-owned ships.
+Standing Orders adds a lightweight interface that lets you clone a Repeat Orders queue from one of player's ship to any number of other player-owned ships.
 
 [h2][b]Features[/b][/h2]
 [list]
-[*] Clone a ship’s running Repeat Orders (currently Single Buy/Sell) onto any selection of eligible targets in a single confirmation step.
-[*] Works only with [b]Container[/b] type of cargo.
-[*] Automatically scales cargo amounts to each target’s hold size while preserving wares, prices, and destinations.
+[*] Clone a ship’s running Repeat Orders onto any selection of eligible targets in a single confirmation step.
+[*] Works with [b]any[/b] order that can be placed under Repeat Orders, not just trade orders - every parameter of every order is copied.
+[*] Automatically scales cargo amounts to each target’s hold size, matching the transport type the order actually uses.
+[*] Target ships only need cargo capacity when the source queue actually trades wares, so queues of non-trade orders can be cloned to any capable ship.
 [/list]
 [h2][b]Requirements[/b][/h2]
 [list]
@@ -106,14 +107,27 @@ Video demonstration of the Standing Orders. Version 1.00
 
 [h2][1.01] - 2026-08-??[/h2]
 [list]
-[*] Fixed
+[*] Added
 [list]
-[*] A source ship that was sold, destroyed, captured or wrecked is no longer kept selected - the context menu offers [b]Select as Source[/b] again instead of a [b]Clone from[/b] entry with an empty ship name
-[*] Cloning is aborted with a warning if the source ship stops being a valid source while the confirmation dialog is open, and target ships that became invalid in the meantime are skipped
+[*] Any order that can run under Repeat Orders can now be cloned, not only Single Buy and Single Sell - all parameters of every order are copied, including radii, positions, price thresholds and object lists
+[*] The confirmation dialog now lists every order with its parameters, matching what the game's own order queue shows, so you can see what will be copied
 [/list]
 [*] Changed
 [list]
+[*] Cargo amounts are scaled using the transport type the order actually uses, instead of always assuming container cargo
+[*] Target ships are only required to have cargo capacity when the source queue actually trades wares
+[*] The target pilot skill requirement now matches the game's own Repeat Orders skill gate - some pilots that were previously accepted will now be rejected
 [*] [b]Deselect as Source[/b] is now available from any player-owned ship, not only from the source ship itself
+[/list]
+[*] Removed
+[list]
+[*] The unfinished [b]Add Location[/b] button in the confirmation dialog, which could leave the map menu in a broken state
+[/list]
+[*] Fixed
+[list]
+[*] The source ship could end up in its own target list when it was part of the current map selection, which wiped its order queue instead of copying it - the source is now always excluded from the targets
+[*] A source ship that was sold, destroyed, captured or wrecked is no longer kept selected - the context menu offers [b]Select as Source[/b] again instead of a [b]Clone from[/b] entry with an empty ship name
+[*] Cloning is aborted with a warning if the source ship stops being a valid source while the confirmation dialog is open, and target ships that became invalid in the meantime are skipped
 [/list]
 [/list]
 [h2][1.00] - 2025-10-30[/h2]
