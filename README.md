@@ -1,6 +1,6 @@
 # Standing Orders
 
-Standing Orders adds a lightweight interface that lets you clone a Repeat Orders queue from one of player's ship to any number of other player-owned ships - and edit that queue before it is applied.
+Standing Orders adds a lightweight interface that lets you clone and edit a Repeat Orders queue from one of player's ship to any number of other player-owned ships.
 
 ## Features
 
